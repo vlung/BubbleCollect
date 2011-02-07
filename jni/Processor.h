@@ -18,10 +18,6 @@
 
 #include "image_pool.h"
 
-#define DETECT_FAST 0
-#define DETECT_STAR 1
-#define DETECT_SURF 2
-
 class Processor
 {
 public:
@@ -29,28 +25,11 @@ public:
   Processor();
   virtual ~Processor();
 
-  void detectAndDrawFeatures(int idx, image_pool* pool, int feature_type);
+  void DetectOutline(int idx, image_pool *pool, double thres1, double thres2);
 
-  bool detectAndDrawChessboard(int idx, image_pool* pool);
-
-  void resetChess();
-
-  int getNumberDetectedChessboards();
-
-  void calibrate(const char* filename);
-
-  void drawText(int idx, image_pool* pool, const char* text);
+  void drawText(int i, image_pool* pool, const char* ctext, int row = -2, const cv::Scalar &color = cv::Scalar::all(255),
+  			   double fontScale = 1, double thickness = .5);
 private:
-  cv::StarFeatureDetector stard;
-  cv::FastFeatureDetector fastd;
-  cv::SurfFeatureDetector surfd;
-  std::vector<cv::KeyPoint> keypoints;
-  std::vector<std::vector<cv::Point2f> > imagepoints;
-
-  cv::Mat K;
-  cv::Mat distortion;
-  cv::Size imgsize;
-
 };
 
 #endif /* PROCESSOR_H_ */

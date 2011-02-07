@@ -4,14 +4,14 @@
 #this points to the root of the opencv trunk - where the original opencv 
 #sources are - with modules 3rparty ...
 ifndef OPENCV_ROOT
-OPENCV_ROOT := /Users/vlung/Documents/workspace/BubbleCollect/opencv
+OPENCV_ROOT := /Users/vlung/Documents/workspace/project/BubbleCollect/opencv
 endif
 
 #you may override this same as above
 #this points to the actually directory that you built opencv for android from
 #maybe in under opencv/android/build
 ifndef OPENCV_BUILD_ROOT
-OPENCV_BUILD_ROOT := /Users/vlung/Documents/workspace/BubbleCollect/opencv/android/build
+OPENCV_BUILD_ROOT := $(OPENCV_ROOT)/android/build
 endif
 
 OPENCV_INCLUDES :=  $(OPENCV_ROOT)/modules/calib3d/include $(OPENCV_ROOT)/modules/contrib/include $(OPENCV_ROOT)/modules/core/include $(OPENCV_ROOT)/modules/features2d/include $(OPENCV_ROOT)/modules/ffmpeg/include $(OPENCV_ROOT)/modules/flann/include $(OPENCV_ROOT)/modules/gpu/include $(OPENCV_ROOT)/modules/gtest/include $(OPENCV_ROOT)/modules/haartraining/include $(OPENCV_ROOT)/modules/highgui/include $(OPENCV_ROOT)/modules/imgproc/include $(OPENCV_ROOT)/modules/legacy/include $(OPENCV_ROOT)/modules/ml/include $(OPENCV_ROOT)/modules/objdetect/include $(OPENCV_ROOT)/modules/traincascade/include $(OPENCV_ROOT)/modules/video/include $(OPENCV_ROOT)/3rdparty/include $(OPENCV_BUILD_ROOT)/include $(OPENCV_ROOT)/include

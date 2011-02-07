@@ -1,248 +1,123 @@
 package com.bubblebot.bubblecollect;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.LinkedList;
-import java.util.Scanner;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.app.Dialog;
-import android.app.ProgressDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
-import android.os.Environment;
-import android.util.Log;
 import android.view.Gravity;
-import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.Toast;
+import android.widget.TextView;
 
+import com.bubblebot.bubblecollect.jni.Processor;
 import com.opencv.camera.CameraConfig;
 import com.opencv.camera.NativePreviewer;
 import com.opencv.camera.NativeProcessor;
 import com.opencv.camera.NativeProcessor.PoolCallback;
 import com.opencv.jni.image_pool;
 import com.opencv.opengl.GL2CameraViewer;
-import com.bubblebot.bubblecollect.jni.Processor;
-import com.bubblebot.bubblecollect.jni.bubblecollect;
 
-public class BubbleCollect extends Activity {
+public class BubbleCollect extends Activity implements SensorEventListener {
 
-	static final int DIALOG_CALIBRATING = 0;
-	static final int DIALOG_CALIBRATION_FILE = 1;
-	private static final int DIALOG_OPENING_TUTORIAL = 2;
-	private static final int DIALOG_TUTORIAL_FAST = 3;
-	private static final int DIALOG_TUTORIAL_SURF = 4;
-	private static final int DIALOG_TUTORIAL_STAR = 5;
-	private static final int DIALOG_TUTORIAL_CHESS = 6;
-	private boolean captureChess;
+	// Default Canny threshold and threshold2 multiplier
+	static private double c_CannyMultiplier = 2.5;
+	private double mCannyThres1 = 40;
 
-	ProgressDialog makeCalibDialog() {
-		ProgressDialog progressDialog;
-		progressDialog = new ProgressDialog(this);
-		progressDialog.setMessage("Callibrating. Please wait...");
-		progressDialog.setCancelable(false);
+	// Members for tracking accelerometer
+	static private float c_StationaryThreshold = 0.2F;
+	// Refresh accelerometer reading no less than .5 seconds
+	static private long c_AccelrefreshInterval = 500000000L;
+	// Auto focus no more than once every 5 seconds
+	static private long c_AutoFocusInterval = 5000000000L;
+	private final float alpha = (float) 0.8;
+	private float[] mAccelMA = new float[3];
+	private float[] mGravity = new float[3];
+	private boolean mStationary = false;
+	private TextView mDebugTextView = null;
+	private long mLastAutoFocusTime = 0;
+	private long mLastRefreshTime = 0;
 
-		return progressDialog;
-	}
+	// final processor so that these processor callbacks can access it
+	private final Processor mProcessor = new Processor();
+	
+	// OpenCV previewer
+	private NativePreviewer mPreview;
+	
+	// GL view for OpenCV previewer
+	private GL2CameraViewer glview;
+	
+	// The OutlineProcessor guides the user to align the camera properly
+	// for capturing a bubble form image
+	class OutlineProcessor implements NativeProcessor.PoolCallback {
 
-	void toasts(int id) {
-		switch (id) {
-		case DIALOG_OPENING_TUTORIAL:
-			Toast.makeText(this, "Try clicking the menu for CV options.",
-					Toast.LENGTH_LONG).show();
-			break;
-		case DIALOG_TUTORIAL_FAST:
-			Toast.makeText(this, "Show biggest rectangular contour",
-					Toast.LENGTH_LONG).show();
-			break;
-		case DIALOG_TUTORIAL_SURF:
-			Toast.makeText(this, "Show all rectangular contours",
-					Toast.LENGTH_LONG).show();
-			break;
-		case DIALOG_TUTORIAL_STAR:
-			Toast.makeText(this, "Show all external contours",
-					Toast.LENGTH_LONG).show();
-			break;
-		case DIALOG_TUTORIAL_CHESS:
-			Toast.makeText(
-					this,
-					"Calibration Mode, Point at a chessboard pattern and press the camera button, space,"
-							+ "or the DPAD to capture.", Toast.LENGTH_LONG)
-					.show();
-			break;
-
-		default:
-			break;
+		public void process(int idx, image_pool pool, long timestamp,
+				NativeProcessor nativeProcessor) {
+			mProcessor.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
+					* c_CannyMultiplier);
 		}
 
 	}
-
-	@Override
-	protected Dialog onCreateDialog(int id) {
-		Dialog dialog;
-		switch (id) {
-		case DIALOG_CALIBRATING:
-			dialog = makeCalibDialog();
-			break;
-
-		case DIALOG_CALIBRATION_FILE:
-			dialog = makeCalibFileAlert();
-			break;
-		default:
-			dialog = null;
-		}
-		return dialog;
-	}
-
-	private Dialog makeCalibFileAlert() {
-		AlertDialog.Builder builder = new AlertDialog.Builder(this);
-		builder.setMessage(calib_text)
-				.setTitle("camera.yml at " + calib_file_loc)
-				.setCancelable(false)
-				.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-					public void onClick(DialogInterface dialog, int id) {
-
-					}
-				});
-		AlertDialog alert = builder.create();
-		return alert;
-	}
-
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see android.app.Activity#onKeyUp(int, android.view.KeyEvent)
-	 */
-	@Override
-	public boolean onKeyUp(int keyCode, KeyEvent event) {
-
-		switch (keyCode) {
-		case KeyEvent.KEYCODE_CAMERA:
-		case KeyEvent.KEYCODE_SPACE:
-		case KeyEvent.KEYCODE_DPAD_CENTER:
-			captureChess = true;
-			return true;
-
-		default:
-			return super.onKeyUp(keyCode, event);
-		}
-
-	}
-
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see android.app.Activity#onKeyLongPress(int, android.view.KeyEvent)
-	 */
-	@Override
-	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
-
-		return super.onKeyLongPress(keyCode, event);
-	}
-
-	/**
-	 * Avoid that the screen get's turned off by the system.
-	 */
+	
+	// Avoid that the screen get's turned off by the system.
 	public void disableScreenTurnOff() {
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
 				WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 	}
 
-	/**
-	 * Set's the orientation to landscape, as this is needed by AndAR.
-	 */
-	public void setOrientation() {
-		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-	}
-
-	/**
-	 * Maximize the application.
-	 */
+	// Use full screen
 	public void setFullscreen() {
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
 				WindowManager.LayoutParams.FLAG_FULLSCREEN);
 	}
 
+	// Hide application title
 	public void setNoTitle() {
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 	}
 
+	// Create options menu
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
-		menu.add("MaxRect");
-		menu.add("AllContours");
-		menu.add("AllRectContours");
-		//menu.add("Chess");
+		menu.add("*2");
+		menu.add("+10");
+		menu.add("-50");
 		menu.add("Settings");
 		return true;
 	}
 
-	private NativePreviewer mPreview;
-	private GL2CameraViewer glview;
-
+	// Handle options menu actions
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
-		LinkedList<PoolCallback> defaultcallbackstack = new LinkedList<PoolCallback>();
-		defaultcallbackstack.addFirst(glview.getDrawCallback());
-		if (item.getTitle().equals("MaxRect")) {
-
-			defaultcallbackstack.addFirst(new FastProcessor());
-			toasts(DIALOG_TUTORIAL_FAST);
-		}
-
-		else if (item.getTitle().equals("Chess")) {
-
-			defaultcallbackstack.addFirst(new CalibrationProcessor());
-			toasts(DIALOG_TUTORIAL_CHESS);
-
-		}
-
-		else if (item.getTitle().equals("AllContours")) {
-
-			defaultcallbackstack.addFirst(new STARProcessor());
-			toasts(DIALOG_TUTORIAL_STAR);
-
-		}
-
-		else if (item.getTitle().equals("AllRectContours")) {
-
-			defaultcallbackstack.addFirst(new SURFProcessor());
-			toasts(DIALOG_TUTORIAL_SURF);
-
-		}
-
-		else if (item.getTitle().equals("Settings")) {
-
-			Intent intent = new Intent(this,CameraConfig.class);
+		if (item.getTitle().equals("+10")) {
+			mCannyThres1 += 10;
+		} else if (item.getTitle().equals("-50")) {
+			mCannyThres1 -= 50;
+		} else if (item.getTitle().equals("*2")) {
+			mCannyThres1 *= 2;
+		} else if (item.getTitle().equals("Settings")) {
+			// Start the CameraConfig activity for camera settings
+			Intent intent = new Intent(this, CameraConfig.class);
 			startActivity(intent);
 		}
-
-		mPreview.addCallbackStack(defaultcallbackstack);
-		
 		return true;
 	}
 
-	@Override
-	public void onOptionsMenuClosed(Menu menu) {
-		// TODO Auto-generated method stub
-		super.onOptionsMenuClosed(menu);
-	}
-
+	// Initialize the application
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -253,12 +128,13 @@ public class BubbleCollect extends Activity {
 		FrameLayout frame = new FrameLayout(this);
 
 		// Create our Preview view and set it as the content of our activity.
-		mPreview = new NativePreviewer(getApplication(), 640, 480);
+		mPreview = new NativePreviewer(getApplication(), 480, 640);
 
 		LayoutParams params = new LayoutParams(LayoutParams.WRAP_CONTENT,
 				LayoutParams.WRAP_CONTENT);
 		params.height = getWindowManager().getDefaultDisplay().getHeight();
-		params.width = (int) (params.height * 4.0 / 2.88);
+		params.width = getWindowManager().getDefaultDisplay().getWidth();
+		// params.width = (int) (params.height * 4.0 / 2.88);
 
 		LinearLayout vidlay = new LinearLayout(getApplication());
 
@@ -278,6 +154,12 @@ public class BubbleCollect extends Activity {
 		gllay.addView(glview, params);
 		frame.addView(gllay);
 
+		LinearLayout buttons = new LinearLayout(getApplicationContext());
+		buttons.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT,
+				LayoutParams.WRAP_CONTENT));
+		buttons.setGravity(Gravity.RIGHT);
+
+		/* Disable the camera button for now
 		ImageButton capture_button = new ImageButton(getApplicationContext());
 		capture_button.setImageDrawable(getResources().getDrawable(
 				android.R.drawable.ic_menu_camera));
@@ -285,44 +167,46 @@ public class BubbleCollect extends Activity {
 				LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 		capture_button.setOnClickListener(new View.OnClickListener() {
 
-			@Override
 			public void onClick(View v) {
-				captureChess = true;
+				// captureChess = true;
 
 			}
 		});
-
-		LinearLayout buttons = new LinearLayout(getApplicationContext());
-		buttons.setLayoutParams(new LayoutParams(LayoutParams.WRAP_CONTENT,
-				LayoutParams.WRAP_CONTENT));
-
 		buttons.addView(capture_button);
+		*/
 
+		// Add the manual focus button to view
 		Button focus_button = new Button(getApplicationContext());
 		focus_button.setLayoutParams(new LayoutParams(
 				LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 		focus_button.setText("Focus");
 		focus_button.setOnClickListener(new View.OnClickListener() {
 
-			@Override
 			public void onClick(View v) {
 				mPreview.postautofocus(100);
 			}
 		});
 		buttons.addView(focus_button);
 
-		frame.addView(buttons);
-		setContentView(frame);
-		toasts(DIALOG_OPENING_TUTORIAL);
-	}
+		// Add a new view for debug messages
+		LinearLayout debugView = new LinearLayout(getApplicationContext());
+		debugView.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT,
+				LayoutParams.WRAP_CONTENT));
+		debugView.setGravity(Gravity.CENTER);
+		mDebugTextView = new TextView(getApplicationContext());
+		debugView.addView(mDebugTextView);
 
-	@Override
-	public boolean onTrackballEvent(MotionEvent event) {
-		if (event.getAction() == MotionEvent.ACTION_UP) {
-			captureChess = true;
-			return true;
-		}
-		return super.onTrackballEvent(event);
+		// Setup frame content
+		frame.addView(buttons);
+		frame.addView(debugView);
+		setContentView(frame);
+
+		// Use color camera
+		SharedPreferences settings = getApplication().getSharedPreferences(
+				CameraConfig.CAMERA_SETTINGS, 0);
+		Editor editor = settings.edit();
+		editor.putInt(CameraConfig.CAMERA_MODE, CameraConfig.CAMERA_MODE_COLOR);
+		editor.commit();
 	}
 
 	@Override
@@ -331,175 +215,92 @@ public class BubbleCollect extends Activity {
 
 		// clears the callback stack
 		mPreview.onPause();
-
 		glview.onPause();
 
+		// Unregister sensor events
+		SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+		sensorManager.unregisterListener(this);
 	}
 
 	@Override
 	protected void onResume() {
 		super.onResume();
+
+		// Register for accelerometer events
+		mAccelMA[0] = mAccelMA[1] = mAccelMA[2] = 1.0F;
+		SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+		sensorManager.registerListener(this,
+				sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+				SensorManager.SENSOR_DELAY_NORMAL);
+
 		glview.onResume();
 		mPreview.setParamsFromPrefs(getApplicationContext());
-		// add an initiall callback stack to the preview on resume...
+		// add an initial callback stack to the preview on resume...
 		// this one will just draw the frames to opengl
 		LinkedList<NativeProcessor.PoolCallback> cbstack = new LinkedList<PoolCallback>();
-		cbstack.add(glview.getDrawCallback());
+		cbstack.addFirst(glview.getDrawCallback());
+		cbstack.addFirst(new OutlineProcessor());
 		mPreview.addCallbackStack(cbstack);
 		mPreview.onResume();
-
 	}
 
-	// final processor so taht these processor callbacks can access it
-	final Processor processor = new Processor();
-
-	class FastProcessor implements NativeProcessor.PoolCallback {
-
-		@Override
-		public void process(int idx, image_pool pool, long timestamp,
-				NativeProcessor nativeProcessor) {
-			processor.detectAndDrawFeatures(idx, pool, bubblecollect.DETECT_FAST);
-
-		}
-
+	// We don't need to track accuracy but we must override this fuction to
+	// avoid compiler error.
+	public void onAccuracyChanged(Sensor arg0, int arg1) {
 	}
 
-	class STARProcessor implements NativeProcessor.PoolCallback {
-
-		@Override
-		public void process(int idx, image_pool pool, long timestamp,
-				NativeProcessor nativeProcessor) {
-			processor.detectAndDrawFeatures(idx, pool, bubblecollect.DETECT_STAR);
-
-		}
-
-	}
-
-	class SURFProcessor implements NativeProcessor.PoolCallback {
-
-		@Override
-		public void process(int idx, image_pool pool, long timestamp,
-				NativeProcessor nativeProcessor) {
-			processor.detectAndDrawFeatures(idx, pool, bubblecollect.DETECT_SURF);
-
-		}
-
-	}
-
-	String calib_text = null;
-	String calib_file_loc = null;
-
-	class CalibrationProcessor implements NativeProcessor.PoolCallback {
-
-		boolean calibrated = false;
-
-		@Override
-		public void process(int idx, image_pool pool, long timestamp,
-				NativeProcessor nativeProcessor) {
-
-			if (calibrated) {
-				processor.drawText(idx, pool, "Calibrated successfully");
+	// Callback function for sensor events
+	public void onSensorChanged(SensorEvent event) {
+		// Handle accelerometer events
+		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+			// Skip this event if we have just handled one not so long ago
+			if (event.timestamp - mLastRefreshTime < c_AccelrefreshInterval)
 				return;
-			}
-			if (processor.getNumberDetectedChessboards() == 10) {
 
-				File opencvdir = new File(
-						Environment.getExternalStorageDirectory(), "opencv");
-				if (!opencvdir.exists()) {
-					opencvdir.mkdir();
+			float[] accel = new float[3];
+			
+			// Update timestamp
+			mLastRefreshTime = event.timestamp;
+
+			// Calculate linear acceleration
+			mGravity[0] = alpha * mGravity[0] + (1 - alpha) * event.values[0];
+			mGravity[1] = alpha * mGravity[1] + (1 - alpha) * event.values[1];
+			mGravity[2] = alpha * mGravity[2] + (1 - alpha) * event.values[2];
+			accel[0] = Math.abs(event.values[0] - mGravity[0]);
+			accel[1] = Math.abs(event.values[1] - mGravity[1]);
+			accel[2] = Math.abs(event.values[2] - mGravity[2]);
+
+			// Calculate the moving averages of the acceleration 
+			for (int i = 0; i < 3; ++i) {
+				mAccelMA[i] = (mAccelMA[i] + accel[i]) / 2;
+			}
+
+			// Check whether the moving averages exceed the threshold
+			if (mAccelMA[0] > c_StationaryThreshold
+					|| mAccelMA[1] > c_StationaryThreshold
+					|| mAccelMA[2] > c_StationaryThreshold) {
+				if (mStationary) {
+					// The phone is moving, reset the moving averages to
+					// allow smooth stationary detection 
+					mStationary = false;
+					mAccelMA[0] = mAccelMA[1] = mAccelMA[2] = 1.0F;
 				}
-				File calibfile = new File(opencvdir, "camera.yml");
-
-				calib_file_loc = calibfile.getAbsolutePath();
-				processor.calibrate(calibfile.getAbsolutePath());
-				Log.i("chessboard", "calibrated");
-				calibrated = true;
-				processor.resetChess();
-				runOnUiThread(new Runnable() {
-
-					@Override
-					public void run() {
-						removeDialog(DIALOG_CALIBRATING);
-
-					}
-				});
-
-				try {
-
-					StringBuilder text = new StringBuilder();
-					String NL = System.getProperty("line.separator");
-					Scanner scanner = new Scanner(calibfile);
-
-					try {
-						while (scanner.hasNextLine()) {
-							text.append(scanner.nextLine() + NL);
-						}
-					} finally {
-						scanner.close();
-					}
-
-					calib_text = text.toString();
-
-					runOnUiThread(new Runnable() {
-
-						@Override
-						public void run() {
-							showDialog(DIALOG_CALIBRATION_FILE);
-
-						}
-					});
-
-				} catch (FileNotFoundException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+			} else {
+				// If the phone has just become stationary, trigger
+				// the autofocus action of the camera unless we
+				// already triggered autofocus not too long ago.
+				if (mStationary == false
+						&& event.timestamp - mLastAutoFocusTime > c_AutoFocusInterval) {
+					mLastAutoFocusTime = event.timestamp;
+					mPreview.postautofocus(100);
 				}
-
-			} else if (captureChess
-					&& processor.detectAndDrawChessboard(idx, pool)) {
-
-				runOnUiThread(new Runnable() {
-
-					String numchess = String.valueOf(processor
-							.getNumberDetectedChessboards());
-
-					@Override
-					public void run() {
-						Toast.makeText(BubbleCollect.this,
-								"Detected " + numchess + " of 10 chessboards",
-								Toast.LENGTH_SHORT).show();
-
-					}
-				});
-				Log.i("bubblecollect",
-						"detected a chessboard, n chess boards found: "
-								+ String.valueOf(processor
-										.getNumberDetectedChessboards()));
-
+				mStationary = true;
 			}
 
-			captureChess = false;
-
-			if (processor.getNumberDetectedChessboards() == 10) {
-				runOnUiThread(new Runnable() {
-
-					@Override
-					public void run() {
-						showDialog(DIALOG_CALIBRATING);
-
-					}
-				});
-
-				processor.drawText(idx, pool, "Calibrating, please wait.");
-			}
-			if (processor.getNumberDetectedChessboards() < 10) {
-
-				processor.drawText(idx, pool,
-						"found " + processor.getNumberDetectedChessboards()
-								+ "/10 chessboards");
-			}
-
+			// Show debug messages
+			String s = String.format("%.2f %.2f %.2f", accel[0], accel[1],
+					accel[2]);
+			mDebugTextView.setText(s);
 		}
-
 	}
-
 }
