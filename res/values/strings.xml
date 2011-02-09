@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-<string name="app_name">BubbleCollect</string>
+<string name="app_name">BubbleBot</string>
 <string name="app_description">Scan and process bubble forms</string>
+<string name="Button01">Feedback (Vince)</string>
+<string name="Button02">ProcessForm (Nicki)</string>
+<string name="ProcessForm">Processing form...</string>
 </resources>

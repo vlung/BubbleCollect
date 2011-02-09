@@ -1,4 +1,4 @@
-package com.bubblebot.bubblecollect;
+package com.bubblebot;
 
 import java.util.LinkedList;
 
@@ -23,7 +23,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import com.bubblebot.bubblecollect.jni.Processor;
+import com.bubblebot.jni.Feedback;
 import com.opencv.camera.CameraConfig;
 import com.opencv.camera.NativePreviewer;
 import com.opencv.camera.NativeProcessor;
@@ -52,7 +52,7 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 	private long mLastRefreshTime = 0;
 
 	// final processor so that these processor callbacks can access it
-	private final Processor mProcessor = new Processor();
+	private final Feedback mFeedback = new Feedback();
 	
 	// OpenCV previewer
 	private NativePreviewer mPreview;
@@ -66,7 +66,7 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 
 		public void process(int idx, image_pool pool, long timestamp,
 				NativeProcessor nativeProcessor) {
-			mProcessor.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
+			mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
 					* c_CannyMultiplier);
 		}
 

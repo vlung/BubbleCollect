@@ -25,8 +25,7 @@ endif
 
 
 # The name of the native library
-#LIBNAME = libcvcamera.so
-LIBNAME = libbubblecollect.so
+LIBNAME = libbubblebot.so
 
 
 # Find all the C++ sources in the native folder
@@ -37,14 +36,13 @@ ANDROID_MKS = $(wildcard jni/*.mk)
 
 SWIG_IS = $(wildcard jni/*.i)
 
-SWIG_MAIN = jni/bubblecollect.i
+SWIG_MAIN = jni/bubblebot.i
 
-SWIG_JAVA_DIR = src/com/bubblebot/bubblecollect/jni
+SWIG_JAVA_DIR = src/com/bubblebot/jni
 SWIG_JAVA_OUT = $(wildcard $(SWIG_JAVA_DIR)/*.java)
 
-
 SWIG_C_DIR = jni/gen
-SWIG_C_OUT = $(SWIG_C_DIR)/bubblecollect_swig.cpp
+SWIG_C_OUT = $(SWIG_C_DIR)/bubblebot.cpp
 
 BUILD_DEFS=OPENCV_CONFIG=$(OPENCV_CONFIG) \
 	PROJECT_PATH=$(PROJECT_PATH) \
@@ -53,26 +51,22 @@ BUILD_DEFS=OPENCV_CONFIG=$(OPENCV_CONFIG) \
 	ARM_TARGETS=$(ARM_TARGETS)
 
 # The real native library stripped of symbols
-LIB		= libs/armeabi-v7a/$(LIBNAME) libs/armeabi/$(LIBNAME)
-
+LIB = libs/armeabi-v7a/$(LIBNAME) libs/armeabi/$(LIBNAME)
 
 all:	$(LIB)
-
 
 #calls the ndk-build script, passing it OPENCV_ROOT and OPENCV_LIBS_DIR
 $(LIB): $(SWIG_C_OUT) $(SOURCES) $(HEADERS) $(ANDROID_MKS)
 	$(ANDROID_NDK_BASE)/ndk-build $(BUILD_DEFS)
-
 
 #this creates the swig wrappers
 $(SWIG_C_OUT): $(SWIG_IS)
 	make clean-swig &&\
 	mkdir -p $(SWIG_C_DIR) &&\
 	mkdir -p $(SWIG_JAVA_DIR) &&\
-	swig -java -c++ -Iopencv/android/android-jni/jni -package  "com.bubblebot.bubblecollect.jni" \
+	swig -java -c++ -Iopencv/android/android-jni/jni -package  "com.bubblebot.jni" \
 	-outdir $(SWIG_JAVA_DIR) \
 	-o $(SWIG_C_OUT) $(SWIG_MAIN)
-	
 	
 #clean targets
 .PHONY: clean  clean-swig cleanall

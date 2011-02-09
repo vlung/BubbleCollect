@@ -1,7 +1,4 @@
-/* File : android-cv.i */
-
-%module bubblecollect 
-
+%module bubblebot
 
 /*
  * the java import code muse be included for the opencv jni wrappers
@@ -23,7 +20,7 @@ import com.opencv.jni.*; //import the android-opencv jni wrappers
 			//check the apk generated, by opening it in an archive manager, to verify that
 			//both these libraries are present
 			System.loadLibrary("android-opencv");
-			System.loadLibrary("bubblecollect");
+			System.loadLibrary("bubblebot");
 		} catch (UnsatisfiedLinkError e) {
 			//badness
 			throw e;
@@ -32,5 +29,5 @@ import com.opencv.jni.*; //import the android-opencv jni wrappers
 
 %}
 
-//include the Processor class swig interface file
+%include "Feedback.i"
 %include "Processor.i"

@@ -13,9 +13,9 @@ LOCAL_LDLIBS += $(OPENCV_LIBS) $(ANDROID_OPENCV_LIBS) -llog -lGLESv2
     
 LOCAL_C_INCLUDES +=  $(OPENCV_INCLUDES) $(ANDROID_OPENCV_INCLUDES)
 
-LOCAL_MODULE    := bubblecollect
+LOCAL_MODULE    := bubblebot
 
-LOCAL_SRC_FILES := Processor.cpp gen/bubblecollect_swig.cpp
+LOCAL_SRC_FILES := Feedback.cpp Processor.cpp gen/bubblebot.cpp
 
 include $(BUILD_SHARED_LIBRARY)
 

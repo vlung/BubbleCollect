@@ -3,7 +3,6 @@
  */
 %{
 #include "Processor.h"
-#include "image_pool.h"
 using namespace cv;
 %}
 
@@ -15,8 +14,7 @@ using namespace cv;
 //referenced by the Processor java generated
 //class
 %typemap(javaimports) Processor "
-import com.opencv.jni.image_pool;// import the image_pool interface for playing nice with
-								 // android-opencv
+import com.opencv.jni.Mat;
 
 /** Processor - for processing images that are stored in an image pool
 */"
@@ -26,8 +24,5 @@ public:
 	Processor();
 	virtual ~Processor();
 
-	void DetectOutline(int idx, image_pool *pool, double thres1, double thres2);
-
-	void drawText(int i, image_pool* pool, const char* ctext, int row = -2, const Scalar &color = Scalar::all(255),
-				  double fontScale = 1, double thickness = .5);
+  	void ProcessForm(Mat img);
 };
