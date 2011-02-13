@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
+import android.graphics.drawable.GradientDrawable.Orientation;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -20,6 +21,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -35,10 +37,10 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 
 	// Default Canny threshold and threshold2 multiplier
 	static private double c_CannyMultiplier = 2.5;
-	private double mCannyThres1 = 40;
+	private double mCannyThres1 = 50;
 
 	// Members for tracking accelerometer
-	static private float c_StationaryThreshold = 0.2F;
+	static private float c_StationaryThreshold = 0.25F;
 	// Refresh accelerometer reading no less than .5 seconds
 	static private long c_AccelrefreshInterval = 500000000L;
 	// Auto focus no more than once every 5 seconds
@@ -53,13 +55,13 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 
 	// final processor so that these processor callbacks can access it
 	private final Feedback mFeedback = new Feedback();
-	
+
 	// OpenCV previewer
 	private NativePreviewer mPreview;
-	
+
 	// GL view for OpenCV previewer
 	private GL2CameraViewer glview;
-	
+
 	// The OutlineProcessor guides the user to align the camera properly
 	// for capturing a bubble form image
 	class OutlineProcessor implements NativeProcessor.PoolCallback {
@@ -71,7 +73,7 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 		}
 
 	}
-	
+
 	// Avoid that the screen get's turned off by the system.
 	public void disableScreenTurnOff() {
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
@@ -94,7 +96,7 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		menu.add("*2");
-		menu.add("+10");
+		menu.add("+20");
 		menu.add("-50");
 		menu.add("Settings");
 		return true;
@@ -103,8 +105,8 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 	// Handle options menu actions
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
-		if (item.getTitle().equals("+10")) {
-			mCannyThres1 += 10;
+		if (item.getTitle().equals("+20")) {
+			mCannyThres1 += 20;
 		} else if (item.getTitle().equals("-50")) {
 			mCannyThres1 -= 50;
 		} else if (item.getTitle().equals("*2")) {
@@ -158,8 +160,8 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 		buttons.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT,
 				LayoutParams.WRAP_CONTENT));
 		buttons.setGravity(Gravity.RIGHT);
+		buttons.setOrientation(1);
 
-		/* Disable the camera button for now
 		ImageButton capture_button = new ImageButton(getApplicationContext());
 		capture_button.setImageDrawable(getResources().getDrawable(
 				android.R.drawable.ic_menu_camera));
@@ -168,12 +170,10 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 		capture_button.setOnClickListener(new View.OnClickListener() {
 
 			public void onClick(View v) {
-				// captureChess = true;
 
 			}
 		});
 		buttons.addView(capture_button);
-		*/
 
 		// Add the manual focus button to view
 		Button focus_button = new Button(getApplicationContext());
@@ -258,7 +258,7 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 				return;
 
 			float[] accel = new float[3];
-			
+
 			// Update timestamp
 			mLastRefreshTime = event.timestamp;
 
@@ -270,7 +270,7 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 			accel[1] = Math.abs(event.values[1] - mGravity[1]);
 			accel[2] = Math.abs(event.values[2] - mGravity[2]);
 
-			// Calculate the moving averages of the acceleration 
+			// Calculate the moving averages of the acceleration
 			for (int i = 0; i < 3; ++i) {
 				mAccelMA[i] = (mAccelMA[i] + accel[i]) / 2;
 			}
@@ -281,7 +281,7 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 					|| mAccelMA[2] > c_StationaryThreshold) {
 				if (mStationary) {
 					// The phone is moving, reset the moving averages to
-					// allow smooth stationary detection 
+					// allow smooth stationary detection
 					mStationary = false;
 					mAccelMA[0] = mAccelMA[1] = mAccelMA[2] = 1.0F;
 				}

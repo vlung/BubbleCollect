@@ -9,17 +9,35 @@ Feedback::Feedback() {
 Feedback::~Feedback() {
 }
 
-// How far are the corner markers away from the edge of screen?
-const int c_cornerMargin = 20;
-// How long should the markers be?
-const int c_cornerLength = c_cornerMargin + 30;
-// How far do we allow a point to be distanced from the corner
-// markers to consider it touches the markers
-const int c_cornerRange = 20;
+// How far do we allow a point to be away from the corner
+// markers to consider it touches the template
+const int c_cornerRange = 50;
+
+// Specify the size of the form template
+const int c_templateHeight = 440;
+const int c_templateWidth = c_templateHeight / 8.5 * 11;
+
+const int c_borderMargin = 10;
+const int c_borderThreshold = 50;
+
+const char* const c_pszCorrectPos = "Correct Position";
+const char* const c_pszRotateLeft = "ROTATE LEFT";
+const char* const c_pszRotateRight = "ROTATE RIGHT";
+const char* const c_pszMoveCloser = "MOVE TOWARDS YOU";
+const char* const c_pszMoveAway = "MOVE AWAY FROM FORM";
+
+enum Side
+{
+	None = -1, Top, Right, Bottom, Left
+};
+
 // Threshold for proper form area
-const int c_minOutlineArea = 200000;
+const int c_minOutlineArea = 180000;
 // Number of rows of the camera image
-static int g_maxRows = -1;
+static int g_maxRows = -1, g_maxCols = -1;
+static Point g_ptUpperLeft, g_ptLowerRight;
+long g_nAcross, g_nTopLeft, g_nTopRight, g_nBottomLeft, g_nBottomRight;
+bool g_fMoveForm;
 
 // Calculate the angle between 2 lines
 float angle(Point pt1, Point pt2, Point pt0) {
@@ -32,31 +50,127 @@ float angle(Point pt1, Point pt2, Point pt0) {
 }
 
 // Evaluate whether a point is close to the corner markers
-bool isNear(Point p) {
-	return (abs(p.x - c_cornerMargin) < c_cornerRange && (abs(p.y - c_cornerMargin)
-			< c_cornerRange || abs(p.y - (g_maxRows - c_cornerMargin)) < c_cornerRange));
+bool isNear(const Point &p) {
+	return ((abs(p.x - g_ptUpperLeft.x) < c_cornerRange && abs(p.y
+			- g_ptUpperLeft.y) < c_cornerRange) || (abs(p.x - g_ptLowerRight.x)
+			< c_cornerRange && abs(p.y - g_ptLowerRight.y) < c_cornerRange));
+}
+
+Side checkBorder(const Point &p)
+{
+	Side result = None;
+
+	if (p.y < c_borderMargin)
+		result = Top;
+	else if (p.y > (g_maxRows - c_borderMargin))
+		result = Bottom;
+	else if (p.x < c_borderMargin)
+		result = Left;
+	else if (p.x > (g_maxCols - c_borderMargin))
+		result = Right;
+	return result;
+}
+
+void checkContour(Mat &mat, const vector<Point> &contour)
+{
+	if (g_fMoveForm) return;
+	if (contour.size() == 2)
+	{
+		Side side1 = checkBorder(contour[0]);
+		Side side2 = checkBorder(contour[1]);
+		if (side1 != None && side2 != None)
+		{
+			long len = (int)arcLength(Mat(contour), false);
+
+			if (len < c_borderThreshold) return;
+
+			if ((side1 % 2) == (side2 % 2))
+			{
+				g_nAcross += len;
+				const Point* p = &contour[0];
+				int n = contour.size();
+				polylines(mat, &p, &n, 1, false, Scalar(255,0,0), 3);
+			}
+			else
+			{
+				Side sideTopBottom = (side1 % 2 == 0) ? side1 : side2;
+				Side sideLeftRight = (side1 % 2 == 1) ? side1 : side2;
+				const Point* p = &contour[0];
+				int n = contour.size();
+				polylines(mat, &p, &n, 1, false, Scalar(255,0,0), 3);
+				if (sideTopBottom == Top)
+				{
+					if (sideLeftRight == Right)
+					{
+						g_nTopRight = max(g_nTopRight, len);
+					}
+					else
+					{
+						g_nTopLeft = max(g_nTopLeft, len);
+					}
+				}
+				else
+				{
+					if (sideLeftRight == Right)
+					{
+						g_nBottomRight = max(g_nBottomRight, len);
+					}
+					else
+					{
+						g_nBottomLeft = max(g_nBottomLeft, len);
+					}
+				}
+			}
+		}
+	}
+	else if (contour.size() == 3 || contour.size() == 4)
+	{
+		int len = (int)arcLength(Mat(contour), false);
+		if (len < c_borderThreshold) return;
+
+		Side side1 = checkBorder(contour[0]);
+		Side side2 = checkBorder(contour[contour.size() - 1]);
+		if (side1 != None && side2 != None)
+		{
+			g_fMoveForm = true;
+
+			const Point* p = &contour[0];
+			int n = contour.size();
+			polylines(mat, &p, &n, 1, false, Scalar(0,0,255), 3);
+		}
+	}
 }
 
 // Detect whether the largest rectangle of an image is well aligned
 // with the corner markers on screen
-void Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
+int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 		double thres2) {
 	Mat img = pool->getImage(idx), imgCanny;
+	int result = 0;
 
 	// Leave if there is no image
 	if (img.empty())
-		return;
+		return result;
 
 	vector < Point > approx;
 	vector < Point > maxRect;
 	vector < vector<Point> > contours;
+	vector < vector<Point> > borderContours;
 	float maxContourArea = 10000;
 	bool fOutlineDetected = false;
-	bool fMatchCorners = false;
 
 	// Initialize the number of rows (height) of the image
-	if (g_maxRows == -1)
+	if (g_maxRows == -1) {
 		g_maxRows = img.rows;
+		g_maxCols = img.cols;
+		g_ptUpperLeft = Point((img.cols - c_templateWidth) / 2, (g_maxRows
+				- c_templateHeight) / 2);
+		g_ptLowerRight = Point(img.cols - g_ptUpperLeft.x, img.rows
+				- g_ptUpperLeft.y);
+	}
+
+	g_nAcross = g_nTopLeft = g_nTopRight = g_nBottomLeft = g_nBottomRight = 0;
+	g_fMoveForm = false;
 
 	// Do Canny transformation on the image
 	Canny(pool->getGrey(idx), imgCanny, thres1, thres2, 3);
@@ -65,14 +179,18 @@ void Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	findContours(imgCanny, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
 
 	// Iterate through all detected contours
-	for (size_t i = 0; i < contours.size(); i++) {
+	for (size_t i = 0; i < contours.size(); ++i) {
 		int nMatchCorners = 0;
 
-		// Approximate the perimmeter of the contours
+		// Approximate the perimeter of the contours
 		approxPolyDP(Mat(contours[i]), approx,
 				arcLength(Mat(contours[i]), true) * 0.01, true);
 
-		// Check whether the perimmeter forms a quadrilateral
+		if (approx.size() <= 4) {
+			checkContour(img, approx);
+		}
+
+		// Check whether the perimeter forms a quadrilateral
 		// Note: absolute value of an area is used because
 		// area may be positive or negative - in accordance with the
 		// contour orientation
@@ -101,10 +219,9 @@ void Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 				if (maxCosine < 0.25) {
 					maxRect = approx;
 					maxContourArea = area;
-					if (nMatchCorners == 2) {
-						fMatchCorners = true;
-						if (area > c_minOutlineArea)
-							fOutlineDetected = true;
+					if (nMatchCorners == 2 && area > c_minOutlineArea) {
+						fOutlineDetected = true;
+						result = 1;
 					}
 				}
 			}
@@ -117,35 +234,49 @@ void Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	Scalar guideColor = fOutlineDetected ? Scalar(0, 255, 0)
 			: Scalar(255, 0, 0);
 	polylines(img, &p, &n, 1, true, guideColor, 3, CV_AA);
-	line(img, Point(c_cornerMargin, c_cornerMargin), Point(c_cornerLength,
-			c_cornerMargin), guideColor, 5, CV_AA);
-	line(img, Point(c_cornerMargin, c_cornerMargin), Point(c_cornerMargin,
-			c_cornerLength), guideColor, 3, CV_AA);
-	line(img, Point(c_cornerMargin, img.rows - c_cornerMargin), Point(
-			c_cornerLength, img.rows - c_cornerMargin), guideColor, 5, CV_AA);
-	line(img, Point(c_cornerMargin, img.rows - c_cornerMargin), Point(
-			c_cornerMargin, img.rows - c_cornerLength), guideColor, 3, CV_AA);
+	rectangle(img, g_ptUpperLeft, g_ptLowerRight, guideColor, 1, CV_AA);
 
 	// Draw Status text
-	char txt[100] = "";
-	Scalar color = Scalar(255,0,0);
-	if (maxContourArea > 10000 && maxContourArea < 200000) {
-		sprintf(txt, "MOVE AWAY FROM FORM");
+	const char *pszMsg = NULL;
+	Scalar color = Scalar(255, 0, 0);
+	if (fOutlineDetected) {
+		pszMsg = c_pszCorrectPos;
+		color = Scalar(0, 255, 0);
 	}
-	if (fMatchCorners) {
-		if (fOutlineDetected) {
-			sprintf(txt, "Correct Position");
-			color = Scalar(0, 255, 0);
-		} else {
-			sprintf(txt, "FORM AREA TOO SMALL, PLEASE REALIGN FORM.");
+	else
+	{
+		long cornerLen = g_nTopLeft + g_nTopRight + g_nBottomLeft + g_nBottomRight;
+
+		if (g_fMoveForm || g_nAcross > cornerLen)
+		{
+			pszMsg = c_pszMoveCloser;
+		}
+		else if (g_nTopLeft + g_nBottomRight > 0 && g_nTopRight + g_nBottomLeft > 0)
+		{
+			if (g_nTopLeft + g_nBottomRight > g_nTopRight + g_nBottomLeft)
+			{
+				pszMsg = c_pszRotateLeft;
+			}
+			else
+			{
+				pszMsg = c_pszRotateRight;
+			}
+		}
+		else if (maxContourArea > 10000 && maxContourArea < 150000)
+		{
+			pszMsg = c_pszMoveAway;
 		}
 	}
-	if (txt[0])
-		drawText(idx, pool, txt, -2, color, 1.6);
+
+	if (pszMsg != NULL)
+		drawText(idx, pool, pszMsg, -2, color, 1.6);
 
 	// Draw debug text
-	sprintf(txt, "Area: %0.2f  %0.2f", maxContourArea, thres1);
+	char txt[100];
+	sprintf(txt, "A%d TL%d TR%d BR%d BL%d", g_nAcross, g_nTopLeft, g_nTopRight, g_nBottomLeft, g_nBottomRight);
 	drawText(idx, pool, txt, -1);
+
+	return result;
 }
 
 // Draw text on screen
@@ -154,7 +285,7 @@ void Feedback::drawText(int i, image_pool* pool, const char* ctext, int row,
 	int fontFace = FONT_HERSHEY_COMPLEX_SMALL;
 	Mat img = pool->getImage(i);
 	string text = ctext;
-	Size textSize =	getTextSize(text, fontFace, fontScale, thickness, NULL);
+	Size textSize = getTextSize(text, fontFace, fontScale, thickness, NULL);
 
 	// Center the text
 	Point textOrg((img.cols - textSize.width) / 2, (row > 0) ? (textSize.height

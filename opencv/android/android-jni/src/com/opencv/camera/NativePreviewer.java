@@ -23,10 +23,27 @@ import com.opencv.camera.NativeProcessor.PoolCallback;
 public class NativePreviewer extends SurfaceView implements
 		SurfaceHolder.Callback, Camera.PreviewCallback, NativeProcessorCallback {
 
-	/** Constructor useful for defining a NativePreviewer in android layout xml
+	private Handler handler = new Handler();
+
+	private Date start;
+	private int fcount = 0;
+	private boolean hasAutoFocus = false;
+	private SurfaceHolder mHolder;
+	private Camera mCamera;
+
+	private NativeProcessor processor;
+
+	private int preview_width, preview_height;
+	private int pixelformat;
+	private PixelFormat pixelinfo;
+
+	private Method mPCWB;
+
+	/**
+	 * Constructor useful for defining a NativePreviewer in android layout xml
 	 * 
 	 * @param context
-	 * @param attributes 
+	 * @param attributes
 	 */
 	public NativePreviewer(Context context, AttributeSet attributes) {
 		super(context, attributes);
@@ -37,14 +54,13 @@ public class NativePreviewer extends SurfaceView implements
 		mHolder.addCallback(this);
 		mHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
 
-		/* TODO get this working!  Can't figure out how to define these in xml 
+		/*
+		 * TODO get this working! Can't figure out how to define these in xml
 		 */
 		preview_width = attributes.getAttributeIntValue("opencv",
 				"preview_width", 600);
 		preview_height = attributes.getAttributeIntValue("opencv",
 				"preview_height", 600);
-		
-		Log.d("NativePreviewer", "Trying to use preview size of " + preview_width + " " + preview_height);
 
 		processor = new NativeProcessor();
 
@@ -54,8 +70,11 @@ public class NativePreviewer extends SurfaceView implements
 	/**
 	 * 
 	 * @param context
-	 * @param preview_width the desired camera preview width - will attempt to get as close to this as possible
-	 * @param preview_height the desired camera preview height
+	 * @param preview_width
+	 *            the desired camera preview width - will attempt to get as
+	 *            close to this as possible
+	 * @param preview_height
+	 *            the desired camera preview height
 	 */
 	public NativePreviewer(Context context, int preview_width,
 			int preview_height) {
@@ -75,21 +94,22 @@ public class NativePreviewer extends SurfaceView implements
 		setZOrderMediaOverlay(false);
 
 	}
-	/** Only call in the oncreate function of the instantiating activity
+
+	/**
+	 * Only call in the oncreate function of the instantiating activity
 	 * 
-	 * @param width desired width
-	 * @param height desired height
+	 * @param width
+	 *            desired width
+	 * @param height
+	 *            desired height
 	 */
-	public void setPreviewSize(int width, int height){
+	public void setPreviewSize(int width, int height) {
 		preview_width = width;
 		preview_height = height;
-		
-		Log.d("NativePreviewer", "Trying to use preview size of " + preview_width + " " + preview_height);
-
 	}
-	
-	public void setParamsFromPrefs(Context ctx){
-		int size[] ={0,0};
+
+	public void setParamsFromPrefs(Context ctx) {
+		int size[] = { 0, 0 };
 		CameraConfig.readImageSize(ctx, size);
 		int mode = CameraConfig.readCameraMode(ctx);
 		setPreviewSize(size[0], size[1]);
@@ -132,8 +152,9 @@ public class NativePreviewer extends SurfaceView implements
 		}
 		preview_width = best_width;
 		preview_height = best_height;
-		
-		Log.d("NativePreviewer", "Determined compatible preview size is: (" + preview_width + "," + preview_height+")");
+
+		Log.d("NativePreviewer", "Determined compatible preview size is: ("
+				+ preview_width + "," + preview_height + ")");
 
 		List<String> fmodes = mCamera.getParameters().getSupportedFocusModes();
 
@@ -150,11 +171,17 @@ public class NativePreviewer extends SurfaceView implements
 
 		List<String> scenemodes = mCamera.getParameters()
 				.getSupportedSceneModes();
-		if (scenemodes != null)
+		if (scenemodes != null) {
 			if (scenemodes.indexOf(Camera.Parameters.SCENE_MODE_STEADYPHOTO) != -1) {
 				parameters
 						.setSceneMode(Camera.Parameters.SCENE_MODE_STEADYPHOTO);
+				Log.d("NativePreviewer", "***Steady mode");
 			}
+		}
+
+		if (mCamera.getParameters().getFlashMode() != null) {
+			parameters.setFlashMode(Camera.Parameters.FLASH_MODE_ON);
+		}
 
 		parameters.setPreviewSize(preview_width, preview_height);
 
@@ -197,7 +224,6 @@ public class NativePreviewer extends SurfaceView implements
 	 * for re-use
 	 */
 	public void onPreviewFrame(byte[] data, Camera camera) {
-
 		if (start == null) {
 			start = new Date();
 		}
@@ -230,30 +256,20 @@ public class NativePreviewer extends SurfaceView implements
 	 * 
 	 */
 	public void onPause() {
-
 		releaseCamera();
-
 		addCallbackStack(null);
-
 		processor.stop();
 
 	}
 
 	public void onResume() {
-
 		processor.start();
-
 	}
 
-	private Method mPCWB;
-
 	private void initForPCWB() {
-
 		try {
-
 			mPCWB = Class.forName("android.hardware.Camera").getMethod(
 					"setPreviewCallbackWithBuffer", PreviewCallback.class);
-
 		} catch (Exception e) {
 			Log.e("NativePreviewer",
 					"Problem setting up for setPreviewCallbackWithBuffer: "
@@ -299,32 +315,21 @@ public class NativePreviewer extends SurfaceView implements
 			// the
 			// callback handler
 			mPCWB.invoke(mCamera, this);
-
-			// Log.d("NativePrevier","setPreviewCallbackWithBuffer: Called method");
-
 		} catch (Exception e) {
-
 			Log.e("NativePreviewer", e.toString());
 		}
 	}
 
 	@SuppressWarnings("unused")
 	private void clearPreviewCallbackWithBuffer() {
-		// mCamera.setPreviewCallback(this);
-		// return;
 		try {
-
 			// If we were able to find the setPreviewCallbackWithBuffer method
 			// of Camera,
 			// we can now invoke it on our Camera instance, setting 'this' to be
 			// the
 			// callback handler
 			mPCWB.invoke(mCamera, (PreviewCallback) null);
-
-			// Log.d("NativePrevier","setPreviewCallbackWithBuffer: cleared");
-
 		} catch (Exception e) {
-
 			Log.e("NativePreviewer", e.toString());
 		}
 	}
@@ -336,10 +341,8 @@ public class NativePreviewer extends SurfaceView implements
 
 	private void initForACB() {
 		try {
-
 			mAcb = Class.forName("android.hardware.Camera").getMethod(
 					"addCallbackBuffer", byte[].class);
-
 		} catch (Exception e) {
 			Log.e("NativePreviewer",
 					"Problem setting up for addCallbackBuffer: " + e.toString());
@@ -347,7 +350,6 @@ public class NativePreviewer extends SurfaceView implements
 	}
 
 	private Runnable autofocusrunner = new Runnable() {
-
 		@Override
 		public void run() {
 			mCamera.autoFocus(autocallback);
@@ -355,7 +357,6 @@ public class NativePreviewer extends SurfaceView implements
 	};
 
 	private Camera.AutoFocusCallback autocallback = new Camera.AutoFocusCallback() {
-
 		@Override
 		public void onAutoFocus(boolean success, Camera camera) {
 			if (!success)
@@ -387,24 +388,21 @@ public class NativePreviewer extends SurfaceView implements
 			// The Surface has been created, acquire the camera and tell it
 			// where
 			// to draw.
-			int i = 0;
-			while (i++ < 5) {
+			for (int i = 0; i < 10; i++)
 				try {
 					mCamera = Camera.open();
 					break;
 				} catch (RuntimeException e) {
 					Thread.sleep(200);
 				}
-			}
-			try {
-				mCamera.setPreviewDisplay(holder);
-			} catch (IOException exception) {
-				mCamera.release();
-				mCamera = null;
-
-			} catch (RuntimeException e) {
-				Log.e("camera", "stacktrace", e);
-			}
+		}
+		try {
+			mCamera.setPreviewDisplay(holder);
+		} catch (IOException exception) {
+			mCamera.release();
+			mCamera = null;
+		} catch (RuntimeException e) {
+			Log.e("camera", "stacktrace", e);
 		}
 	}
 
@@ -424,23 +422,8 @@ public class NativePreviewer extends SurfaceView implements
 		mPCWB = null;
 	}
 
-	private Handler handler = new Handler();
-
-	private Date start;
-	private int fcount = 0;
-	private boolean hasAutoFocus = false;
-	private SurfaceHolder mHolder;
-	private Camera mCamera;
-
-	private NativeProcessor processor;
-
-	private int preview_width, preview_height;
-	private int pixelformat;
-	private PixelFormat pixelinfo;
-
 	public void setGrayscale(boolean b) {
 		processor.setGrayscale(b);
-		
 	}
 
 }
