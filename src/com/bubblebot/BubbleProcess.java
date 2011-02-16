@@ -11,7 +11,7 @@ import com.opencv.jni.Mat;
 
 public class BubbleProcess extends Activity  {
 	
-    private class ProcessFormTask extends AsyncTask<Mat, Void, Void> {
+    private class ProcessFormTask extends AsyncTask<Void, Void, Void> {
         private Activity parent;
         private ProgressDialog dialog;
 
@@ -41,8 +41,8 @@ public class BubbleProcess extends Activity  {
         }
 
 		@Override
-		protected Void doInBackground(Mat... image) {
-			mProcessor.ProcessForm(image[0]);
+		protected Void doInBackground(Void... arg) {
+			mProcessor.ProcessForm();
 			return null;
 		}
     }
@@ -71,9 +71,8 @@ public class BubbleProcess extends Activity  {
 		super.onResume();
 		
 		// Use null for now. Eventually we will pass in a real image to the processor.
-		Mat[] image = new Mat[1];
-		image[0] = new Mat();
-		mTask.execute(image);
+		Void[] arg = null;
+		mTask.execute(arg);
 	}
 }
 	

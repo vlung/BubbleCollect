@@ -1,5 +1,7 @@
 #include "Feedback.h"
 #include <sys/stat.h>
+#include "log.h"
+#define LOG_COMPONENT "BubbleFeedback"
 
 using namespace cv;
 
@@ -148,9 +150,14 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	Mat img = pool->getImage(idx), imgCanny;
 	int result = 0;
 
+	LOGI("Entering DetectOutline");
+
 	// Leave if there is no image
 	if (img.empty())
+	{
+		LOGE("Failed to get image");
 		return result;
+	}
 
 	vector < Point > approx;
 	vector < Point > maxRect;
@@ -275,6 +282,8 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	char txt[100];
 	sprintf(txt, "A%d TL%d TR%d BR%d BL%d", g_nAcross, g_nTopLeft, g_nTopRight, g_nBottomLeft, g_nBottomRight);
 	drawText(idx, pool, txt, -1);
+
+	LOGI("Exiting DetectOutline");
 
 	return result;
 }

@@ -24,5 +24,5 @@ public:
 	Processor();
 	virtual ~Processor();
 
-  	void ProcessForm(Mat img);
+  	void ProcessForm();
 };
