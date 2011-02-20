@@ -1,16 +1,15 @@
 package com.opencv.camera;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import android.content.Context;
 import android.graphics.PixelFormat;
 import android.hardware.Camera;
-import android.hardware.Camera.PictureCallback;
+import android.hardware.Camera.PreviewCallback;
 import android.hardware.Camera.Size;
 import android.os.Handler;
 import android.util.AttributeSet;
@@ -22,20 +21,24 @@ import com.opencv.camera.NativeProcessor.NativeProcessorCallback;
 import com.opencv.camera.NativeProcessor.PoolCallback;
 
 public class NativePreviewer extends SurfaceView implements
-		SurfaceHolder.Callback, Camera.PreviewCallback, Camera.PictureCallback, NativeProcessorCallback {
+		SurfaceHolder.Callback, Camera.PreviewCallback, NativeProcessorCallback {
 
 	private Handler handler = new Handler();
 
+	private Date start;
+	private int fcount = 0;
 	private boolean hasAutoFocus = false;
 	private SurfaceHolder mHolder;
 	private Camera mCamera;
+
 	private NativeProcessor processor;
-	
+
 	private int preview_width, preview_height;
 	private int pixelformat;
-	
-	private byte[] previewBuffer = null;
-	
+	private PixelFormat pixelinfo;
+
+	private Method mPCWB;
+
 	/**
 	 * Constructor useful for defining a NativePreviewer in android layout xml
 	 * 
@@ -44,7 +47,7 @@ public class NativePreviewer extends SurfaceView implements
 	 */
 	public NativePreviewer(Context context, AttributeSet attributes) {
 		super(context, attributes);
-
+		listAllCameraMethods();
 		// Install a SurfaceHolder.Callback so we get notified when the
 		// underlying surface is created and destroyed.
 		mHolder = getHolder();
@@ -77,6 +80,7 @@ public class NativePreviewer extends SurfaceView implements
 			int preview_height) {
 		super(context);
 
+		listAllCameraMethods();
 		// Install a SurfaceHolder.Callback so we get notified when the
 		// underlying surface is created and destroyed.
 		mHolder = getHolder();
@@ -88,39 +92,17 @@ public class NativePreviewer extends SurfaceView implements
 
 		processor = new NativeProcessor();
 		setZOrderMediaOverlay(false);
+
 	}
 
-	public void onPictureTaken(byte[] data, Camera camera) {
-		try {
-			FileOutputStream jpgFile = new FileOutputStream(
-					"/sdcard/temp.jpg", false);
-			jpgFile.write(data);
-			jpgFile.close();
-			Log.i("NativePreviewer", "Picture saved to /sdcard/temp.jpg");
-		} catch (Exception e) {
-			Log.e("NativePreviewer", "Failed to save photo", e);
-		} finally {
-			// Set up the preview buffer and resume preview
-			mCamera.setPreviewCallbackWithBuffer(this);
-			setPreviewCallbackBuffer();
-			mCamera.startPreview();
-		}
-	}
-
-	public void takePicture() {
-		Log.i("NativePreviewer", "Taking picture...");
-		try {
-			// Clear preview callback. Otherwise, camera will
-			// use the preview buffer for saving the photo and it
-			// will fail because the buffer is not big enough.
-			mCamera.setPreviewCallback(null);
-			mCamera.takePicture(null, null, this);
-			mCamera.stopPreview();
-		} catch (Exception e) {
-			Log.e("NativePreviewer", "takePicture", e);
-		}
-	}
-
+	/**
+	 * Only call in the oncreate function of the instantiating activity
+	 * 
+	 * @param width
+	 *            desired width
+	 * @param height
+	 *            desired height
+	 */
 	public void setPreviewSize(int width, int height) {
 		preview_width = width;
 		preview_height = height;
@@ -135,6 +117,7 @@ public class NativePreviewer extends SurfaceView implements
 	}
 
 	public void surfaceCreated(SurfaceHolder holder) {
+
 	}
 
 	public void surfaceDestroyed(SurfaceHolder holder) {
@@ -142,13 +125,15 @@ public class NativePreviewer extends SurfaceView implements
 	}
 
 	public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
+
 		try {
 			initCamera(mHolder);
 		} catch (InterruptedException e) {
-			Log.e("NativePreviewer", "Failed to open camera", e);
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 			return;
 		}
-		
+
 		// Now that the size is known, set up the camera parameters and begin
 		// the preview.
 
@@ -198,15 +183,33 @@ public class NativePreviewer extends SurfaceView implements
 			parameters.setFlashMode(Camera.Parameters.FLASH_MODE_ON);
 		}
 
-		parameters.setPictureFormat(PixelFormat.JPEG);
-
 		parameters.setPreviewSize(preview_width, preview_height);
 
 		mCamera.setParameters(parameters);
 
-		setPreviewCallbackBuffer();
-		mCamera.setPreviewCallbackWithBuffer(this);
+		pixelinfo = new PixelFormat();
+		pixelformat = mCamera.getParameters().getPreviewFormat();
+		PixelFormat.getPixelFormatInfo(pixelformat, pixelinfo);
+
+		Size preview_size = mCamera.getParameters().getPreviewSize();
+		preview_width = preview_size.width;
+		preview_height = preview_size.height;
+		int bufSize = preview_width * preview_height * pixelinfo.bitsPerPixel
+				/ 8;
+
+		// Must call this before calling addCallbackBuffer to get all the
+		// reflection variables setup
+		initForACB();
+		initForPCWB();
+
+		// Use only one buffer, so that we don't preview to many frames and bog
+		// down system
+		byte[] buffer = new byte[bufSize];
+		addCallbackBuffer(buffer);
+		setPreviewCallbackWithBuffer();
+
 		mCamera.startPreview();
+
 	}
 
 	public void postautofocus(int delay) {
@@ -221,19 +224,26 @@ public class NativePreviewer extends SurfaceView implements
 	 * for re-use
 	 */
 	public void onPreviewFrame(byte[] data, Camera camera) {
-		if (processor.isActive()) {
-			processor.post(data, preview_width, preview_height, pixelformat,
-					System.nanoTime(), this);
+		if (start == null) {
+			start = new Date();
 		}
-		else
-		{
-			Log.i("NativePreviewer", "Ignoring preview frame since processor is inactive.");
+
+		processor.post(data, preview_width, preview_height, pixelformat,
+				System.nanoTime(), this);
+
+		fcount++;
+		if (fcount % 100 == 0) {
+			double ms = (new Date()).getTime() - start.getTime();
+			Log.i("NativePreviewer", "fps:" + fcount / (ms / 1000.0));
+			start = new Date();
+			fcount = 0;
 		}
+
 	}
 
 	@Override
 	public void onDoneNativeProcessing(byte[] buffer) {
-		mCamera.addCallbackBuffer(previewBuffer);
+		addCallbackBuffer(buffer);
 	}
 
 	public void addCallbackStack(LinkedList<PoolCallback> callbackstack) {
@@ -249,29 +259,93 @@ public class NativePreviewer extends SurfaceView implements
 		releaseCamera();
 		addCallbackStack(null);
 		processor.stop();
+
 	}
 
 	public void onResume() {
-//
-//		setPreviewCallbackBuffer();
-//		mCamera.setPreviewCallbackWithBuffer(this);
 		processor.start();
 	}
 
-	private void setPreviewCallbackBuffer() {
+	private void initForPCWB() {
+		try {
+			mPCWB = Class.forName("android.hardware.Camera").getMethod(
+					"setPreviewCallbackWithBuffer", PreviewCallback.class);
+		} catch (Exception e) {
+			Log.e("NativePreviewer",
+					"Problem setting up for setPreviewCallbackWithBuffer: "
+							+ e.toString());
+		}
+
+	}
+
+	/**
+	 * This method allows you to add a byte buffer to the queue of buffers to be
+	 * used by preview. See:
+	 * http://android.git.kernel.org/?p=platform/frameworks
+	 * /base.git;a=blob;f=core/java/android/hardware/Camera.java;hb=9d
+	 * b3d07b9620b4269ab33f78604a36327e536ce1
+	 * 
+	 * @param b
+	 *            The buffer to register. Size should be width * height *
+	 *            bitsPerPixel / 8.
+	 */
+	private void addCallbackBuffer(byte[] b) {
 
 		try {
-			PixelFormat pixelinfo = new PixelFormat();
-			pixelformat = mCamera.getParameters().getPreviewFormat();
-			PixelFormat.getPixelFormatInfo(pixelformat, pixelinfo);
-			
-			Size previewSize = mCamera.getParameters().getPreviewSize();
 
-			previewBuffer = new byte[previewSize.width * previewSize.height * pixelinfo.bitsPerPixel / 8];
-			mCamera.addCallbackBuffer(previewBuffer);
+			mAcb.invoke(mCamera, b);
 		} catch (Exception e) {
 			Log.e("NativePreviewer",
 					"invoking addCallbackBuffer failed: " + e.toString());
+		}
+	}
+
+	/**
+	 * Use this method instead of setPreviewCallback if you want to use manually
+	 * allocated buffers. Assumes that "this" implements Camera.PreviewCallback
+	 */
+	private void setPreviewCallbackWithBuffer() {
+		// mCamera.setPreviewCallback(this);
+		// return;
+		try {
+
+			// If we were able to find the setPreviewCallbackWithBuffer method
+			// of Camera,
+			// we can now invoke it on our Camera instance, setting 'this' to be
+			// the
+			// callback handler
+			mPCWB.invoke(mCamera, this);
+		} catch (Exception e) {
+			Log.e("NativePreviewer", e.toString());
+		}
+	}
+
+	@SuppressWarnings("unused")
+	private void clearPreviewCallbackWithBuffer() {
+		try {
+			// If we were able to find the setPreviewCallbackWithBuffer method
+			// of Camera,
+			// we can now invoke it on our Camera instance, setting 'this' to be
+			// the
+			// callback handler
+			mPCWB.invoke(mCamera, (PreviewCallback) null);
+		} catch (Exception e) {
+			Log.e("NativePreviewer", e.toString());
+		}
+	}
+
+	/**
+	 * These variables are re-used over and over by addCallbackBuffer
+	 */
+	private Method mAcb;
+
+	private void initForACB() {
+		try {
+			mAcb = Class.forName("android.hardware.Camera").getMethod(
+					"addCallbackBuffer", byte[].class);
+		} catch (Exception e) {
+			Log.e("NativePreviewer",
+					"Problem setting up for addCallbackBuffer: " + e.toString());
 		}
 	}
 
@@ -290,19 +364,24 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	};
 
-
-//	private void listAllCameraMethods() {
-//		try {
-//			Class<?> c = Class.forName("android.hardware.Camera");
-//			Method[] m = c.getMethods();
-//			for (int i = 0; i < m.length; i++) {
-//				Log.d("NativePreviewer", "  method:" + m[i].toString());
-//			}
-//		} catch (Exception e) {
-//			// TODO Auto-generated catch block
-//			Log.e("NativePreviewer", e.toString());
-//		}
-//	}
+	/**
+	 * This method will list all methods of the android.hardware.Camera class,
+	 * even the hidden ones. With the information it provides, you can use the
+	 * same approach I took below to expose methods that were written but hidden
+	 * in eclair
+	 */
+	private void listAllCameraMethods() {
+		try {
+			Class<?> c = Class.forName("android.hardware.Camera");
+			Method[] m = c.getMethods();
+			for (int i = 0; i < m.length; i++) {
+				Log.d("NativePreviewer", "  method:" + m[i].toString());
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			Log.e("NativePreviewer", e.toString());
+		}
+	}
 
 	private void initCamera(SurfaceHolder holder) throws InterruptedException {
 		if (mCamera == null) {
@@ -337,7 +416,10 @@ public class NativePreviewer extends SurfaceView implements
 			mCamera.release();
 		}
 
+		// processor = null;
 		mCamera = null;
+		mAcb = null;
+		mPCWB = null;
 	}
 
 	public void setGrayscale(boolean b) {

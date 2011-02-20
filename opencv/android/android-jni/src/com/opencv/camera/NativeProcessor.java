@@ -125,12 +125,6 @@ public class NativeProcessor {
 		mthread = new ProcessorThread();
 		mthread.start();
 	}
-	
-	public boolean isActive()
-	{
-		return (mthread != null);
-	}
-	
 	/**
 	 * post is used to notify the processor that a preview frame is ready, this
 	 * will return almost immediately. if the processor is busy, returns false
