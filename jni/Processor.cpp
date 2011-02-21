@@ -15,10 +15,10 @@ void Processor::ProcessForm()
 	LOGI("Entering ProcessForm()");
 
 	//Load image
-	IplImage *img=cvLoadImage("/sdcard/test.jpg");
+	IplImage *img=cvLoadImage("/sdcard/BubbleBot/capturedImages/test.jpg");
 	if(!img)
 	{
-		LOGE("Failed to open /sdcard/test.jpg");
+		LOGE("Failed to open /sdcard/BubbleBot/capturedImages/test.jpg");
 		return;
 	}
 
@@ -102,7 +102,29 @@ void Processor::ProcessForm()
 	}
 
 	//Save image
-	cvSaveImage("/sdcard/result.jpg" ,img);
+	cvSaveImage("/sdcard/BubbleBot/processedImages/result.jpg" ,img);
+
+	/*open a file in text mode with write permissions.*/
+	FILE *file = fopen("/sdcard/BubbleBot/processedText/testfile.txt", "wt");
+	if(file==NULL)
+	{
+		//If unable to open the specified file display error and return.
+		LOGE("Failed to open /sdcard/BubbleBot/processedText/testfile.txt");
+		return;
+	}
+
+	//Print some random text for now
+	fprintf (file,"Date: 2/20/2011\n");
+	fprintf (file,"Number of years in Thane: 5\n");
+	fprintf (file,"Number of years in this slum: 2\n");
+	fprintf (file,"Ration card (Y/N): Y\n");
+	fprintf (file,"Name on voters roll (Y/N): Y\n");
+	fprintf (file,"Voter ID card (Y/N): Y\n");
+	fprintf (file,"Voter ID number: 4567891\n");
+	fprintf (file,"Mother tongue: Hindi\n");
+
+	//release the file pointer.
+	fclose(file);
 
 	// Cleanup
 	cvReleaseImage(&hue);

@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.widget.FrameLayout;
 
 import com.bubblebot.jni.Processor;
-import com.opencv.jni.Mat;
 
 public class BubbleProcess extends Activity  {
 	
