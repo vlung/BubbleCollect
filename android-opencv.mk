@@ -4,7 +4,7 @@
 #this points to the root of the opencv trunk - where the original opencv 
 #sources are - with modules 3rparty ...
 ifndef OPENCV_ROOT
-OPENCV_ROOT := /Users/nixdell/BubbleBot/opencv
+OPENCV_ROOT := /Users/vlung/Documents/workspace/project/BubbleCollect/opencv
 endif
 
 #you may override this same as above
@@ -24,7 +24,7 @@ ARMOBJS_V7A := local/armeabi-v7a
 #OPENCV_LIB_DIRS := -L$(OPENCV_BUILD_ROOT)/obj/$(ARMOBJS_V7A) \
 #    -L$(OPENCV_BUILD_ROOT)/obj/$(ARMOBJS) -L$(OPENCV_BUILD_ROOT)/bin/ndk/$(ARMOBJS) \
 #    -L$(OPENCV_BUILD_ROOT)/bin/ndk/$(ARMOBJS_V7A)
-OPENCV_LIB_DIRS := \
+OPENCV_LIB_DIRS := -L$(OPENCV_BUILD_ROOT)/obj/$(ARMOBJS_V7A) \
     -L$(OPENCV_BUILD_ROOT)/obj/$(ARMOBJS) 
 
 ANDROID_OPENCV_LIB_DIRS := -L$(OPENCV_ROOT)/android/android-jni/libs/armeabi-v7a \

@@ -28,8 +28,7 @@ const char* const c_pszRotateRight = "ROTATE RIGHT";
 const char* const c_pszMoveCloser = "MOVE TOWARDS YOU";
 const char* const c_pszMoveAway = "MOVE AWAY FROM FORM";
 
-enum Side
-{
+enum Side {
 	None = -1, Top, Right, Bottom, Left
 };
 
@@ -58,8 +57,7 @@ bool isNear(const Point &p) {
 			< c_cornerRange && abs(p.y - g_ptLowerRight.y) < c_cornerRange));
 }
 
-Side checkBorder(const Point &p)
-{
+Side checkBorder(const Point &p) {
 	Side result = None;
 
 	if (p.y < c_borderMargin)
@@ -73,72 +71,57 @@ Side checkBorder(const Point &p)
 	return result;
 }
 
-void checkContour(Mat &mat, const vector<Point> &contour)
-{
-	if (g_fMoveForm) return;
-	if (contour.size() == 2)
-	{
+void checkContour(Mat &mat, const vector<Point> &contour) {
+	if (g_fMoveForm)
+		return;
+	if (contour.size() == 2) {
 		Side side1 = checkBorder(contour[0]);
 		Side side2 = checkBorder(contour[1]);
-		if (side1 != None && side2 != None)
-		{
-			long len = (int)arcLength(Mat(contour), false);
+		if (side1 != None && side2 != None) {
+			long len = (int) arcLength(Mat(contour), false);
 
-			if (len < c_borderThreshold) return;
+			if (len < c_borderThreshold)
+				return;
 
-			if ((side1 % 2) == (side2 % 2))
-			{
+			if ((side1 % 2) == (side2 % 2)) {
 				g_nAcross += len;
 				const Point* p = &contour[0];
 				int n = contour.size();
-				polylines(mat, &p, &n, 1, false, Scalar(255,0,0), 3);
-			}
-			else
-			{
+				polylines(mat, &p, &n, 1, false, Scalar(255, 0, 0), 3);
+			} else {
 				Side sideTopBottom = (side1 % 2 == 0) ? side1 : side2;
 				Side sideLeftRight = (side1 % 2 == 1) ? side1 : side2;
 				const Point* p = &contour[0];
 				int n = contour.size();
-				polylines(mat, &p, &n, 1, false, Scalar(255,0,0), 3);
-				if (sideTopBottom == Top)
-				{
-					if (sideLeftRight == Right)
-					{
+				polylines(mat, &p, &n, 1, false, Scalar(255, 0, 0), 3);
+				if (sideTopBottom == Top) {
+					if (sideLeftRight == Right) {
 						g_nTopRight = max(g_nTopRight, len);
-					}
-					else
-					{
+					} else {
 						g_nTopLeft = max(g_nTopLeft, len);
 					}
-				}
-				else
-				{
-					if (sideLeftRight == Right)
-					{
+				} else {
+					if (sideLeftRight == Right) {
 						g_nBottomRight = max(g_nBottomRight, len);
-					}
-					else
-					{
+					} else {
 						g_nBottomLeft = max(g_nBottomLeft, len);
 					}
 				}
 			}
 		}
-	}
-	else if (contour.size() == 3 || contour.size() == 4)
-	{
-		int len = (int)arcLength(Mat(contour), false);
-		if (len < c_borderThreshold) return;
+	} else if (contour.size() == 3 || contour.size() == 4) {
+		int len = (int) arcLength(Mat(contour), false);
+		if (len < c_borderThreshold)
+			return;
 
 		Side side1 = checkBorder(contour[0]);
 		Side side2 = checkBorder(contour[contour.size() - 1]);
-		if (side1 != None && side2 != None)
-		{
+		if (side1 != None && side2 != None) {
 			g_fMoveForm = true;
 
 			const Point* p = &contour[0];
 			int n = contour.size();
-			polylines(mat, &p, &n, 1, false, Scalar(0,0,255), 3);
+			polylines(mat, &p, &n, 1, false, Scalar(0, 0, 255), 3);
 		}
 	}
 }
@@ -153,8 +136,7 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	LOGI("Entering DetectOutline");
 
 	// Leave if there is no image
-	if (img.empty())
-	{
+	if (img.empty()) {
 		LOGE("Failed to get image");
 		return result;
 	}
@@ -163,6 +145,7 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	vector < Point > maxRect;
 	vector < vector<Point> > contours;
 	vector < vector<Point> > borderContours;
+	vector < Vec2f > lines;
 	float maxContourArea = 10000;
 	bool fOutlineDetected = false;
 
@@ -184,6 +167,23 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 
 	// Find all external contours of the image
 	findContours(imgCanny, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+
+	// Do Canny transformation on the image
+	Canny(pool->getGrey(idx), imgCanny, thres1 * 3, thres2 * 3, 3);
+
+	HoughLines(imgCanny, lines, 1, CV_PI/180, 300);
+    for( size_t i = 0; i < lines.size(); i++ )
+    {
+        float rho = lines[i][0];
+        float theta = lines[i][1];
+        double a = cos(theta), b = sin(theta);
+        double x0 = a*rho, y0 = b*rho;
+        Point pt1(cvRound(x0 + 1000*(-b)),
+                  cvRound(y0 + 1000*(a)));
+        Point pt2(cvRound(x0 - 1000*(-b)),
+                  cvRound(y0 - 1000*(a)));
+        line( img, pt1, pt2, Scalar::all(255), 3, 8 );
+    }
 
 	// Iterate through all detected contours
 	for (size_t i = 0; i < contours.size(); ++i) {
@@ -249,28 +249,20 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	if (fOutlineDetected) {
 		pszMsg = c_pszCorrectPos;
 		color = Scalar(0, 255, 0);
-	}
-	else
-	{
-		long cornerLen = g_nTopLeft + g_nTopRight + g_nBottomLeft + g_nBottomRight;
+	} else {
+		long cornerLen = g_nTopLeft + g_nTopRight + g_nBottomLeft
+				+ g_nBottomRight;
 
-		if (g_fMoveForm || g_nAcross > cornerLen)
-		{
+		if (g_fMoveForm || g_nAcross > cornerLen) {
 			pszMsg = c_pszMoveCloser;
-		}
-		else if (g_nTopLeft + g_nBottomRight > 0 && g_nTopRight + g_nBottomLeft > 0)
-		{
-			if (g_nTopLeft + g_nBottomRight > g_nTopRight + g_nBottomLeft)
-			{
+		} else if (g_nTopLeft + g_nBottomRight > 0 && g_nTopRight
+				+ g_nBottomLeft > 0) {
+			if (g_nTopLeft + g_nBottomRight > g_nTopRight + g_nBottomLeft) {
 				pszMsg = c_pszRotateLeft;
-			}
-			else
-			{
+			} else {
 				pszMsg = c_pszRotateRight;
 			}
-		}
-		else if (maxContourArea > 10000 && maxContourArea < 150000)
-		{
+		} else if (maxContourArea > 10000 && maxContourArea < 150000) {
 			pszMsg = c_pszMoveAway;
 		}
 	}
@@ -280,7 +272,9 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 
 	// Draw debug text
 	char txt[100];
-	sprintf(txt, "A%d TL%d TR%d BR%d BL%d", g_nAcross, g_nTopLeft, g_nTopRight, g_nBottomLeft, g_nBottomRight);
+	sprintf(txt, "A%d C%.2f N%d %.2f %.2f", g_nAcross, thres1, lines.size(),
+			lines.size() > 0 ? lines[0][0] : -1.0F,
+			lines.size() > 0 ? lines[0][1] : -1.0f);
 	drawText(idx, pool, txt, -1);
 
 	LOGI("Exiting DetectOutline");

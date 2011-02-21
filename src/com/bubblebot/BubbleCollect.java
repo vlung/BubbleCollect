@@ -3,15 +3,18 @@ package com.bubblebot;
 import java.util.LinkedList;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
-import android.graphics.drawable.GradientDrawable.Orientation;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -61,6 +64,22 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 
 	// GL view for OpenCV previewer
 	private GL2CameraViewer glview;
+	
+	private ProgressDialog progDlg = null;
+	
+	private final Handler mHandler = new Handler();
+	
+	private final Runnable mTakePhoto = new Runnable() {
+		public void run()
+		{
+			mPreview.takePicture();
+		}
+	};
+	
+	private void takePhoto()
+	{
+		mHandler.post(mTakePhoto);
+	}
 
 	// The OutlineProcessor guides the user to align the camera properly
 	// for capturing a bubble form image
@@ -68,10 +87,12 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 
 		public void process(int idx, image_pool pool, long timestamp,
 				NativeProcessor nativeProcessor) {
-			mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
-					* c_CannyMultiplier);
+			if (1 == mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
+					* c_CannyMultiplier))
+			{
+				takePhoto();
+			}
 		}
-
 	}
 
 	// Avoid that the screen get's turned off by the system.
@@ -168,9 +189,8 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 		capture_button.setLayoutParams(new LayoutParams(
 				LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 		capture_button.setOnClickListener(new View.OnClickListener() {
-
 			public void onClick(View v) {
-
+				takePhoto();
 			}
 		});
 		buttons.addView(capture_button);
@@ -200,6 +220,11 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 		frame.addView(buttons);
 		frame.addView(debugView);
 		setContentView(frame);
+		
+		progDlg = new ProgressDialog(this, ProgressDialog.STYLE_SPINNER);
+		progDlg.setIndeterminate(true);
+		progDlg.setMessage("Taking photo...");
+		progDlg.setCancelable(false);
 
 		// Use color camera
 		SharedPreferences settings = getApplication().getSharedPreferences(
@@ -298,9 +323,9 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 			}
 
 			// Show debug messages
-			String s = String.format("%.2f %.2f %.2f", accel[0], accel[1],
-					accel[2]);
-			mDebugTextView.setText(s);
+//			String s = String.format("%.2f %.2f %.2f", accel[0], accel[1],
+//					accel[2]);
+//			mDebugTextView.setText(s);
 		}
 	}
 }
