@@ -1,6 +1,7 @@
 #include "Processor.h"
 #include <sys/stat.h>
 #include "log.h"
+#include <string>
 #define LOG_COMPONENT "BubbleProcessor"
 
 Processor::Processor() {
@@ -10,16 +11,25 @@ Processor::~Processor() {
 }
 
 // Digitize the given bubble form
-void Processor::ProcessForm()
+char* Processor::ProcessForm(char* filename)
 {
+	char* captureDir = "/sdcard/BubbleBot/capturedImages/";
+	char* processDir = "/sdcard/BubbleBot/processedImages/";
+	char* dataDir = "/sdcard/BubbleBot/processedText/";
+
+	char fullname[50];
+	strcpy (fullname,captureDir);
+	strcat (fullname,filename);
+	strcat (fullname,".jpg");
+
 	LOGI("Entering ProcessForm()");
 
 	//Load image
-	IplImage *img=cvLoadImage("/sdcard/BubbleBot/capturedImages/test.jpg");
+	IplImage *img=cvLoadImage(fullname);
 	if(!img)
 	{
-		LOGE("Failed to open /sdcard/BubbleBot/capturedImages/test.jpg");
-		return;
+		LOGE("Image load failed");
+		return NULL;
 	}
 
 	//Create image to use as work canvas
@@ -102,15 +112,24 @@ void Processor::ProcessForm()
 	}
 
 	//Save image
-	cvSaveImage("/sdcard/BubbleBot/processedImages/result.jpg" ,img);
+	char saveLocation[50];
+	strcpy (saveLocation,processDir);
+	strcat (saveLocation,filename);
+	strcat (saveLocation,".jpg");
+	cvSaveImage(saveLocation ,img);
 
 	/*open a file in text mode with write permissions.*/
-	FILE *file = fopen("/sdcard/BubbleBot/processedText/testfile.txt", "wt");
+	char fileLocation[50];
+	strcpy (fileLocation,dataDir);
+	strcat (fileLocation,filename);
+	strcat (fileLocation,".txt");
+
+	FILE *file = fopen(fileLocation, "wt");
 	if(file==NULL)
 	{
 		//If unable to open the specified file display error and return.
-		LOGE("Failed to open /sdcard/BubbleBot/processedText/testfile.txt");
-		return;
+		LOGE("Failed to save text file");
+		return NULL;
 	}
 
 	//Print some random text for now
@@ -138,4 +157,5 @@ void Processor::ProcessForm()
 	cvReleaseImage(&rImHSV);
 
 	LOGI("Exiting ProcessForm()");
+	return filename;
 }

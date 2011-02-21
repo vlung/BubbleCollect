@@ -82,6 +82,8 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 		
 		//Start activity to handle actions after taking photo
 		Intent intent = new Intent(getApplication(), AfterPhotoTaken.class);
+		//TODO: change this filename to the one stored by feedback algorithm
+		intent.putExtra("file", "a.jpg");
 		startActivity(intent); 
 	}
 

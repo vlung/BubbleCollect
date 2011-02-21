@@ -24,5 +24,5 @@ public:
 	Processor();
 	virtual ~Processor();
 
-  	void ProcessForm();
+  	char* ProcessForm(char* filename);
 };
