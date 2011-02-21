@@ -1,5 +1,7 @@
 package com.bubblebot;
 
+import java.io.File;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -12,20 +14,47 @@ public class BubbleBot extends Activity {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
        super.onCreate(savedInstanceState);
-       setContentView(R.layout.main); // Setup the UI
+       setContentView(R.layout.bubble_bot); // Setup the UI
        
-       // Hook up handler for form scan button
-       Button button01 = (Button) findViewById(R.id.Button01);
-       button01.setOnClickListener(new View.OnClickListener() {
+       // Set up directories if they do not exist
+       File dir = new File("/sdcard/BubbleBot/capturedImages");
+       dir.mkdirs();
+       dir = new File("/sdcard/BubbleBot/processedImages");
+       dir.mkdirs();
+       dir = new File("/sdcard/BubbleBot/processedText");
+       dir.mkdirs();
+
+       
+       // Hook up handler for scan form button
+       Button scanForm = (Button) findViewById(R.id.ScanButton);
+       scanForm.setOnClickListener(new View.OnClickListener() {
            public void onClick(View v) {
         	Intent intent = new Intent(getApplication(), BubbleCollect.class);
    			startActivity(intent); 
            }
        });
+       
+       // Hook up handler for view scanned forms button
+       Button viewForms = (Button) findViewById(R.id.ViewFormsButton);
+       viewForms.setOnClickListener(new View.OnClickListener() {
+           public void onClick(View v) {
+        	Intent intent = new Intent(getApplication(), ViewBubbleForms.class);
+   			startActivity(intent); 
+           }
+       });
+       
+       // Hook up handler for bubblebot instructions button
+       Button instructions = (Button) findViewById(R.id.InstructionsButton);
+       instructions.setOnClickListener(new View.OnClickListener() {
+           public void onClick(View v) {
+        	Intent intent = new Intent(getApplication(), BubbleInstructions.class);
+   			startActivity(intent); 
+           }
+       });
 
-       // Hook up handler for form scan button
-       Button button02 = (Button) findViewById(R.id.Button02);
-       button02.setOnClickListener(new View.OnClickListener() {
+       // Hook up handler for process form button
+       Button processForm = (Button) findViewById(R.id.ProcessButton);
+       processForm.setOnClickListener(new View.OnClickListener() {
            public void onClick(View v) {
         	Intent intent = new Intent(getApplication(), BubbleProcess.class);
    			startActivity(intent); 
