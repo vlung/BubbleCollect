@@ -8,6 +8,7 @@
 <string name="bubble_instructions_activity">BubbleBot Instructions</string>
 <string name="display_processed_form_activity">Display Processed Form</string>
 <string name="display_processed_data_activity">Display Processed Data</string>
+<string name="after_photo_taken_activity">Captured Image</string>
 <string name="WelcomeScreen">To begin, select an option below:</string>
 <string name="ScanButton">Scan New Form</string>
 <string name="ViewFormsButton">View Scanned Forms</string>

@@ -79,6 +79,12 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 	private void takePhoto()
 	{
 		mHandler.post(mTakePhoto);
+		
+		//Start activity to handle actions after taking photo
+		Intent intent = new Intent(getApplication(), AfterPhotoTaken.class);
+		//TODO: change this filename to the one stored by feedback algorithm
+		intent.putExtra("file", "a.jpg");
+		startActivity(intent); 
 	}
 
 	// The OutlineProcessor guides the user to align the camera properly

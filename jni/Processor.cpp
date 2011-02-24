@@ -1,6 +1,7 @@
 #include "Processor.h"
 #include <sys/stat.h>
 #include "log.h"
+#include <string>
 #define LOG_COMPONENT "BubbleProcessor"
 
 Processor::Processor() {
@@ -10,16 +11,25 @@ Processor::~Processor() {
 }
 
 // Digitize the given bubble form
-void Processor::ProcessForm()
+char* Processor::ProcessForm(char* filename)
 {
+	char* captureDir = "/sdcard/BubbleBot/capturedImages/";
+	char* processDir = "/sdcard/BubbleBot/processedImages/";
+	char* dataDir = "/sdcard/BubbleBot/processedText/";
+
+	char fullname[50];
+	strcpy (fullname,captureDir);
+	strcat (fullname,filename);
+	strcat (fullname,".jpg");
+
 	LOGI("Entering ProcessForm()");
 
 	//Load image
-	IplImage *img=cvLoadImage("/sdcard/test.jpg");
+	IplImage *img=cvLoadImage(fullname);
 	if(!img)
 	{
-		LOGE("Failed to open /sdcard/test.jpg");
-		return;
+		LOGE("Image load failed");
+		return NULL;
 	}
 
 	//Create image to use as work canvas
@@ -102,7 +112,38 @@ void Processor::ProcessForm()
 	}
 
 	//Save image
-	cvSaveImage("/sdcard/result.jpg" ,img);
+	char saveLocation[50];
+	strcpy (saveLocation,processDir);
+	strcat (saveLocation,filename);
+	strcat (saveLocation,".jpg");
+	cvSaveImage(saveLocation ,img);
+
+	/*open a file in text mode with write permissions.*/
+	char fileLocation[50];
+	strcpy (fileLocation,dataDir);
+	strcat (fileLocation,filename);
+	strcat (fileLocation,".txt");
+
+	FILE *file = fopen(fileLocation, "wt");
+	if(file==NULL)
+	{
+		//If unable to open the specified file display error and return.
+		LOGE("Failed to save text file");
+		return NULL;
+	}
+
+	//Print some random text for now
+	fprintf (file,"Date: 2/20/2011\n");
+	fprintf (file,"Number of years in Thane: 5\n");
+	fprintf (file,"Number of years in this slum: 2\n");
+	fprintf (file,"Ration card (Y/N): Y\n");
+	fprintf (file,"Name on voters roll (Y/N): Y\n");
+	fprintf (file,"Voter ID card (Y/N): Y\n");
+	fprintf (file,"Voter ID number: 4567891\n");
+	fprintf (file,"Mother tongue: Hindi\n");
+
+	//release the file pointer.
+	fclose(file);
 
 	// Cleanup
 	cvReleaseImage(&hue);
@@ -116,4 +157,5 @@ void Processor::ProcessForm()
 	cvReleaseImage(&rImHSV);
 
 	LOGI("Exiting ProcessForm()");
+	return filename;
 }

@@ -5,16 +5,17 @@ import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.FrameLayout;
 
 import com.bubblebot.jni.Processor;
-import com.opencv.jni.Mat;
 
 public class BubbleProcess extends Activity  {
 	
     private class ProcessFormTask extends AsyncTask<Void, Void, Void> {
         private Activity parent;
         private ProgressDialog dialog;
+        private String filename;
 
         // Constructor
         public ProcessFormTask(Activity parent) {
@@ -42,16 +43,20 @@ public class BubbleProcess extends Activity  {
             
             //Display the processed form
             Intent intent = new Intent(getApplication(), DisplayProcessedForm.class);
+            intent.putExtra("file", filename);
+            Log.d("FILENAME", filename);
             startActivity(intent); 
         }
 
 		@Override
 		protected Void doInBackground(Void... arg) {
-			mProcessor.ProcessForm();
+			filename = mProcessor.ProcessForm(pictureName);
+			filename = filename + ".jpg";
 			return null;
 		}
     }
  
+    private String pictureName;
 	private final Processor mProcessor = new Processor();
 	private ProcessFormTask mTask = null;
 	
@@ -59,6 +64,12 @@ public class BubbleProcess extends Activity  {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		Bundle extras = getIntent().getExtras(); 
+		if(extras !=null)
+	    {
+	   	   pictureName = extras.getString("file");
+	   	   pictureName = (pictureName.substring(0,pictureName.length()-4));
+	    }
 		mTask = new ProcessFormTask(this);
 		
 		FrameLayout frame = new FrameLayout(this);
