@@ -6,13 +6,16 @@ import java.io.FileReader;
 import java.io.IOException;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 public class DisplayProcessedData extends Activity{
 	
 	TextView data;
+	Button button;
 	File dir = new File("/sdcard/BubbleBot/processedText/");
 
 	String filename = "";
@@ -50,6 +53,15 @@ public class DisplayProcessedData extends Activity{
 
        data = (TextView) findViewById(R.id.text);
        data.setText("Data from: " + text);
+       
+       button = (Button) findViewById(R.id.button);
+       button.setOnClickListener(new View.OnClickListener() {  
+	       public void onClick(View v) {
+	    	   //Back to the menu
+	    	   Intent intent = new Intent(getApplication(), BubbleBot.class);
+   			   startActivity(intent); 
+	       }
+	    });
 	}
 
 }
