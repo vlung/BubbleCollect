@@ -44,7 +44,6 @@ public class BubbleProcess extends Activity  {
             //Display the processed form
             Intent intent = new Intent(getApplication(), DisplayProcessedForm.class);
             intent.putExtra("file", filename);
-            Log.d("FILENAME", filename);
             startActivity(intent); 
         }
 

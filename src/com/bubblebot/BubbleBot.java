@@ -57,6 +57,7 @@ public class BubbleBot extends Activity {
        processForm.setOnClickListener(new View.OnClickListener() {
            public void onClick(View v) {
         	Intent intent = new Intent(getApplication(), BubbleProcess.class);
+        	intent.putExtra("file", "test.jpg");
    			startActivity(intent); 
            }
        });
