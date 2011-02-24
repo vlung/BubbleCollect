@@ -1,0 +1,4 @@
+android-opencv.mk
+local.env.mk
+local.properties
+src/com/bubblebot/jni/
