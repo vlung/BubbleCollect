@@ -133,7 +133,7 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	Mat img = pool->getImage(idx), imgCanny;
 	int result = 0;
 
-	LOGI("Entering DetectOutline");
+//	LOGI("Entering DetectOutline");
 
 	// Leave if there is no image
 	if (img.empty()) {
@@ -145,7 +145,6 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	vector < Point > maxRect;
 	vector < vector<Point> > contours;
 	vector < vector<Point> > borderContours;
-	vector < Vec2f > lines;
 	float maxContourArea = 10000;
 	bool fOutlineDetected = false;
 
@@ -167,23 +166,6 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 
 	// Find all external contours of the image
 	findContours(imgCanny, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
-
-	// Do Canny transformation on the image
-	Canny(pool->getGrey(idx), imgCanny, thres1 * 3, thres2 * 3, 3);
-
-	HoughLines(imgCanny, lines, 1, CV_PI/180, 300);
-    for( size_t i = 0; i < lines.size(); i++ )
-    {
-        float rho = lines[i][0];
-        float theta = lines[i][1];
-        double a = cos(theta), b = sin(theta);
-        double x0 = a*rho, y0 = b*rho;
-        Point pt1(cvRound(x0 + 1000*(-b)),
-                  cvRound(y0 + 1000*(a)));
-        Point pt2(cvRound(x0 - 1000*(-b)),
-                  cvRound(y0 - 1000*(a)));
-        line( img, pt1, pt2, Scalar::all(255), 3, 8 );
-    }
 
 	// Iterate through all detected contours
 	for (size_t i = 0; i < contours.size(); ++i) {
@@ -271,13 +253,11 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 		drawText(idx, pool, pszMsg, -2, color, 1.6);
 
 	// Draw debug text
-	char txt[100];
-	sprintf(txt, "A%d C%.2f N%d %.2f %.2f", g_nAcross, thres1, lines.size(),
-			lines.size() > 0 ? lines[0][0] : -1.0F,
-			lines.size() > 0 ? lines[0][1] : -1.0f);
-	drawText(idx, pool, txt, -1);
+//	char txt[100];
+//	sprintf(txt, "A%d C%.2f", g_nAcross, thres1);
+//	drawText(idx, pool, txt, -1);
 
-	LOGI("Exiting DetectOutline");
+//	LOGI("Exiting DetectOutline");
 
 	return result;
 }

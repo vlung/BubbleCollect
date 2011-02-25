@@ -11,7 +11,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 public class AfterPhotoTaken extends Activity {
-	
+
 	ImageView image;
 	TextView text;
 	Button retake;
@@ -19,41 +19,45 @@ public class AfterPhotoTaken extends Activity {
 	Bitmap bm;
 	String dir = "/sdcard/BubbleBot/capturedImages/";
 	String filename = "";
-	
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
-       super.onCreate(savedInstanceState);
-       setContentView(R.layout.after_photo_taken);
-       
-       Bundle extras = getIntent().getExtras(); 
-       if(extras !=null)
-       {
-    	   filename = extras.getString("file");
-       }
-       
-       text = (TextView) findViewById(R.id.text);
-       text.setText("Displaying " + dir + filename);
-       
-       image = (ImageView) findViewById(R.id.image);
-       bm = BitmapFactory.decodeFile(dir + filename);
-       image.setImageBitmap(bm);
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.after_photo_taken);
 
-       retake = (Button) findViewById(R.id.retake_button);
-       retake.setOnClickListener(new View.OnClickListener() {
-	       public void onClick(View v) {
-	    	   //TODO
-	    	   //return to feedback algorithm
-	       }
-	    });
-       
-       process = (Button) findViewById(R.id.process_button);
-       process.setOnClickListener(new View.OnClickListener() {
-	       public void onClick(View v) {
-	    	   	//Start process form algorithm
-	    	   	Intent intent = new Intent(getApplication(), BubbleProcess.class);
-	    	   	intent.putExtra("file", filename);
-	   			startActivity(intent);
-	       }
-	    });
+		Bundle extras = getIntent().getExtras();
+		if (extras != null) {
+			filename = extras.getString("file");
+		}
+
+		text = (TextView) findViewById(R.id.text);
+		text.setText("Displaying " + dir + filename);
+
+		image = (ImageView) findViewById(R.id.image);
+		bm = BitmapFactory.decodeFile(dir + filename);
+		image.setImageBitmap(bm);
+
+		retake = (Button) findViewById(R.id.retake_button);
+		retake.setOnClickListener(new View.OnClickListener() {
+			public void onClick(View v) {
+				// Start process form algorithm
+				Intent intent = new Intent(getApplication(),
+						BubbleCollect.class);
+				startActivity(intent);
+				finish();
+			}
+		});
+
+		process = (Button) findViewById(R.id.process_button);
+		process.setOnClickListener(new View.OnClickListener() {
+			public void onClick(View v) {
+				// Start process form algorithm
+				Intent intent = new Intent(getApplication(),
+						BubbleProcess.class);
+				intent.putExtra("file", filename);
+				startActivity(intent);
+				finish();
+			}
+		});
 	}
 }

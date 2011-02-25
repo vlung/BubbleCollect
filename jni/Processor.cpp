@@ -4,6 +4,14 @@
 #include <string>
 #define LOG_COMPONENT "BubbleProcessor"
 
+using namespace std;
+
+const char* const c_pszCaptureDir = "/sdcard/BubbleBot/capturedImages/";
+const char* const c_pszProcessDir = "/sdcard/BubbleBot/processedImages/";
+const char* const c_pszDataDir = "/sdcard/BubbleBot/processedText/";
+const char* const c_pszJpg= ".jpg";
+const char* const c_pszTxt= ".txt";
+
 Processor::Processor() {
 }
 
@@ -13,19 +21,14 @@ Processor::~Processor() {
 // Digitize the given bubble form
 char* Processor::ProcessForm(char* filename)
 {
-	char* captureDir = "/sdcard/BubbleBot/capturedImages/";
-	char* processDir = "/sdcard/BubbleBot/processedImages/";
-	char* dataDir = "/sdcard/BubbleBot/processedText/";
-
-	char fullname[50];
-	strcpy (fullname,captureDir);
-	strcat (fullname,filename);
-	strcat (fullname,".jpg");
+	string fullname = c_pszCaptureDir;
+	fullname += filename;
+	fullname += c_pszJpg;
 
 	LOGI("Entering ProcessForm()");
 
 	//Load image
-	IplImage *img=cvLoadImage(fullname);
+	IplImage *img=cvLoadImage(fullname.c_str());
 	if(!img)
 	{
 		LOGE("Image load failed");
@@ -112,19 +115,17 @@ char* Processor::ProcessForm(char* filename)
 	}
 
 	//Save image
-	char saveLocation[50];
-	strcpy (saveLocation,processDir);
-	strcat (saveLocation,filename);
-	strcat (saveLocation,".jpg");
-	cvSaveImage(saveLocation ,img);
+	string saveLocation = c_pszProcessDir;
+	saveLocation += filename;
+	saveLocation += c_pszJpg;
+	cvSaveImage(saveLocation.c_str(), img);
 
 	/*open a file in text mode with write permissions.*/
-	char fileLocation[50];
-	strcpy (fileLocation,dataDir);
-	strcat (fileLocation,filename);
-	strcat (fileLocation,".txt");
+	string fileLocation = c_pszDataDir;
+	fileLocation += filename;
+	fileLocation += c_pszTxt;
 
-	FILE *file = fopen(fileLocation, "wt");
+	FILE *file = fopen(fileLocation.c_str(), "wt");
 	if(file==NULL)
 	{
 		//If unable to open the specified file display error and return.

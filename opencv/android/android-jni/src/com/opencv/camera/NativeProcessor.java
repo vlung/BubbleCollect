@@ -25,6 +25,7 @@ import com.opencv.jni.opencv;
  *
  */
 public class NativeProcessor {
+	
 	/** Users that would like to be able to have access to live video frames
 	 * should implement a PoolCallback
 	 * the idx and pool contain the images, specifically at idx == 0 is the
@@ -243,7 +244,7 @@ public class NativeProcessor {
 
 				e.printStackTrace();
 			} finally {
-
+				postobjects.clear();
 			}
 		}
 

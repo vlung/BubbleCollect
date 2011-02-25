@@ -4,7 +4,6 @@ import java.util.LinkedList;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -12,9 +11,9 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -31,12 +30,13 @@ import android.widget.TextView;
 import com.bubblebot.jni.Feedback;
 import com.opencv.camera.CameraConfig;
 import com.opencv.camera.NativePreviewer;
+import com.opencv.camera.NativePreviewer.PictureSavedCallback;
 import com.opencv.camera.NativeProcessor;
 import com.opencv.camera.NativeProcessor.PoolCallback;
 import com.opencv.jni.image_pool;
 import com.opencv.opengl.GL2CameraViewer;
 
-public class BubbleCollect extends Activity implements SensorEventListener {
+public class BubbleCollect extends Activity implements SensorEventListener, PictureSavedCallback {
 
 	// Default Canny threshold and threshold2 multiplier
 	static private double c_CannyMultiplier = 2.5;
@@ -76,15 +76,19 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 		}
 	};
 	
+
+	public void OnPictureSaved(String filename) {
+		//Start activity to handle actions after taking photo
+		Intent intent = new Intent(getApplication(), AfterPhotoTaken.class);
+		intent.putExtra("file", filename);
+		Log.i("BubbleCollect", "Starting AfterPhotoTaken activity with " + filename + "...");
+		startActivity(intent);
+		finish();
+	}
+	
 	private void takePhoto()
 	{
 		mHandler.post(mTakePhoto);
-		
-		//Start activity to handle actions after taking photo
-		Intent intent = new Intent(getApplication(), AfterPhotoTaken.class);
-		//TODO: change this filename to the one stored by feedback algorithm
-		intent.putExtra("file", "a.jpg");
-		startActivity(intent); 
 	}
 
 	// The OutlineProcessor guides the user to align the camera properly
@@ -157,7 +161,7 @@ public class BubbleCollect extends Activity implements SensorEventListener {
 		FrameLayout frame = new FrameLayout(this);
 
 		// Create our Preview view and set it as the content of our activity.
-		mPreview = new NativePreviewer(getApplication(), 480, 640);
+		mPreview = new NativePreviewer(getApplication(), 480, 640, this);
 
 		LayoutParams params = new LayoutParams(LayoutParams.WRAP_CONTENT,
 				LayoutParams.WRAP_CONTENT);
