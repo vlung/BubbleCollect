@@ -22,58 +22,73 @@ import com.opencv.camera.NativeProcessor.NativeProcessorCallback;
 import com.opencv.camera.NativeProcessor.PoolCallback;
 
 public class NativePreviewer extends SurfaceView implements
-		SurfaceHolder.Callback, Camera.PreviewCallback, Camera.PictureCallback, NativeProcessorCallback {
+		SurfaceHolder.Callback, Camera.PreviewCallback, Camera.PictureCallback,
+		NativeProcessorCallback {
 
-	public interface PictureSavedCallback
-	{
+	public interface PictureSavedCallback {
 		void OnPictureSaved(String filename);
 	}
-	
+
 	private PictureSavedCallback pictureSavedCallback = null;
-	
+
 	private Handler mHandler = new Handler();
 
 	private boolean mHasAutoFocus = false;
 	private SurfaceHolder mHolder;
 	private Camera mCamera;
 	private NativeProcessor mProcessor;
-	
+
 	private int mPreview_width, mPreview_height;
 	private int mPixelformat;
-	
+
 	private byte[] mPreviewBuffer = null;
 	private Boolean mFnExistSetPreviewCallbackWithBuffer = false;
-	
-	private void init()
-	{
+	private Method mFnAddCallbackBuffer = null;
+	private Method mFnSetPreviewCallbackWithBuffer = null;
+
+	private void init() {
 		// Install a SurfaceHolder.Callback so we get notified when the
 		// underlying surface is created and destroyed.
 		mHolder = getHolder();
 		mHolder.addCallback(this);
 		mHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-		
+
 		mProcessor = new NativeProcessor();
 		setZOrderMediaOverlay(false);
-		
+
 		mFnExistSetPreviewCallbackWithBuffer = false;
-		
+
 		// Check if camera APIs are available
-        try {
-        	Class.forName("android.hardware.Camera").getMethod(
-                    "setPreviewCallbackWithBuffer", PreviewCallback.class);
-        	mFnExistSetPreviewCallbackWithBuffer = true;
-        } catch (Exception e) {
-            Log.e("NativePreviewer",
-                    "Problem setting up for setPreviewCallbackWithBuffer: " + e.toString());
-        }
+		try {
+			mFnSetPreviewCallbackWithBuffer = Class.forName(
+					"android.hardware.Camera").getMethod(
+					"setPreviewCallbackWithBuffer", PreviewCallback.class);
+		} catch (Exception e) {
+			Log.e("NativePreviewer",
+					"This device does not support setPreviewCallbackWithBuffer.");
+			mFnSetPreviewCallbackWithBuffer = null;
+		}
+		try {
+			mFnAddCallbackBuffer = Class.forName("android.hardware.Camera")
+					.getMethod("addCallbackBuffer", byte[].class);
+		} catch (Exception e) {
+			Log.e("NativePreviewer",
+					"This device does not support addCallbackBuffer.");
+			mFnAddCallbackBuffer = null;
+		}
+		if (mFnSetPreviewCallbackWithBuffer != null
+				&& mFnAddCallbackBuffer != null) {
+			mFnExistSetPreviewCallbackWithBuffer = true;
+		}
 	}
-	
-	public NativePreviewer(Context context, AttributeSet attributes, PictureSavedCallback callback) {
+
+	public NativePreviewer(Context context, AttributeSet attributes,
+			PictureSavedCallback callback) {
 		super(context, attributes);
-		
+
 		init();
 		pictureSavedCallback = callback;
-		
+
 		/*
 		 * TODO get this working! Can't figure out how to define these in xml
 		 */
@@ -108,16 +123,16 @@ public class NativePreviewer extends SurfaceView implements
 		try {
 			Time curTime = new Time();
 			curTime.setToNow();
-			
+
 			String filename = curTime.format2445() + ".jpg";
-			
-			FileOutputStream jpgFile = new FileOutputStream(
-					captureImageFolder + filename, false);
+
+			FileOutputStream jpgFile = new FileOutputStream(captureImageFolder
+					+ filename, false);
 			jpgFile.write(data);
 			jpgFile.close();
-			Log.i("NativePreviewer", "Picture saved to " + captureImageFolder + filename);
-			if (pictureSavedCallback != null)
-			{
+			Log.i("NativePreviewer", "Picture saved to " + captureImageFolder
+					+ filename);
+			if (pictureSavedCallback != null) {
 				pictureSavedCallback.OnPictureSaved(filename);
 			}
 		} catch (Exception e) {
@@ -167,7 +182,7 @@ public class NativePreviewer extends SurfaceView implements
 			Log.e("NativePreviewer", "Failed to open camera", e);
 			return;
 		}
-		
+
 		// Now that the size is known, set up the camera parameters and begin
 		// the preview.
 
@@ -240,28 +255,28 @@ public class NativePreviewer extends SurfaceView implements
 	 */
 	public void onPreviewFrame(byte[] data, Camera camera) {
 		if (mProcessor.isActive()) {
-			if (mFnExistSetPreviewCallbackWithBuffer)
-			{
-				mProcessor.post(data, mPreview_width, mPreview_height, mPixelformat,
-						System.nanoTime(), this);
-			}
-			else
-			{
+			if (mFnExistSetPreviewCallbackWithBuffer) {
+				mProcessor.post(data, mPreview_width, mPreview_height,
+						mPixelformat, System.nanoTime(), this);
+			} else {
 				System.arraycopy(data, 0, mPreviewBuffer, 0, data.length);
-				mProcessor.post(mPreviewBuffer, mPreview_width, mPreview_height, mPixelformat,
-						System.nanoTime(), this);
+				mProcessor.post(mPreviewBuffer, mPreview_width,
+						mPreview_height, mPixelformat, System.nanoTime(), this);
 			}
-		}
-		else
-		{
-			Log.i("NativePreviewer", "Ignoring preview frame since processor is inactive.");
+		} else {
+			Log.i("NativePreviewer",
+					"Ignoring preview frame since processor is inactive.");
 		}
 	}
 
 	public void onDoneNativeProcessing(byte[] buffer) {
-		if (mFnExistSetPreviewCallbackWithBuffer)
-		{
-			mCamera.addCallbackBuffer(buffer);
+		if (mFnExistSetPreviewCallbackWithBuffer) {
+			try {
+				mFnAddCallbackBuffer.invoke(mCamera, buffer);
+			} catch (Exception e) {
+				Log.e("NativePreviewer", "Invoking addCallbackBuffer failed: "
+						+ e.toString());
+			}
 		}
 	}
 
@@ -275,18 +290,14 @@ public class NativePreviewer extends SurfaceView implements
 	 * 
 	 */
 	public void onPause() {
-		try
-		{
+		try {
+			mCamera.setPreviewCallback(null);
 			mCamera.stopPreview();
 			addCallbackStack(null);
 			mProcessor.stop();
-		}
-		catch(Exception e)
-		{
+		} catch (Exception e) {
 			Log.e("NativePreviewer", "Error during onPause()", e);
-		}
-		finally
-		{
+		} finally {
 			releaseCamera();
 		}
 	}
@@ -304,25 +315,29 @@ public class NativePreviewer extends SurfaceView implements
 	}
 
 	private void setPreviewCallbackBuffer() {
-		try {
-			PixelFormat pixelinfo = new PixelFormat();
-			mPixelformat = mCamera.getParameters().getPreviewFormat();
-			PixelFormat.getPixelFormatInfo(mPixelformat, pixelinfo);
-			
-			Size previewSize = mCamera.getParameters().getPreviewSize();
 
-			mPreviewBuffer = new byte[previewSize.width * previewSize.height * pixelinfo.bitsPerPixel / 8];
-			mCamera.addCallbackBuffer(mPreviewBuffer);
-		} catch (Exception e) {
-			Log.e("NativePreviewer",
-					"invoking addCallbackBuffer failed: " + e.toString());
-		}
-		if (mFnExistSetPreviewCallbackWithBuffer)
-		{
-			mCamera.setPreviewCallbackWithBuffer(this);
-		}
-		else
-		{
+		PixelFormat pixelinfo = new PixelFormat();
+		mPixelformat = mCamera.getParameters().getPreviewFormat();
+		PixelFormat.getPixelFormatInfo(mPixelformat, pixelinfo);
+
+		Size previewSize = mCamera.getParameters().getPreviewSize();
+		mPreviewBuffer = new byte[previewSize.width * previewSize.height
+				* pixelinfo.bitsPerPixel / 8];
+
+		if (mFnExistSetPreviewCallbackWithBuffer) {
+			try {
+				mFnAddCallbackBuffer.invoke(mCamera, mPreviewBuffer);
+			} catch (Exception e) {
+				Log.e("NativePreviewer", "Invoking addCallbackBuffer failed: "
+						+ e.toString());
+			}
+			try {
+				mFnSetPreviewCallbackWithBuffer.invoke(mCamera, this);
+			} catch (Exception e) {
+				Log.e("NativePreviewer", "Invoking setPreviewCallbackWithBuffer failed: "
+						+ e.toString());
+			}
+		} else {
 			mCamera.setPreviewCallback(this);
 		}
 	}
@@ -339,20 +354,6 @@ public class NativePreviewer extends SurfaceView implements
 				postautofocus(1000);
 		}
 	};
-
-
-//	private void listAllCameraMethods() {
-//		try {
-//			Class<?> c = Class.forName("android.hardware.Camera");
-//			Method[] m = c.getMethods();
-//			for (int i = 0; i < m.length; i++) {
-//				Log.d("NativePreviewer", "  method:" + m[i].toString());
-//			}
-//		} catch (Exception e) {
-//			// TODO Auto-generated catch block
-//			Log.e("NativePreviewer", e.toString());
-//		}
-//	}
 
 	private void initCamera(SurfaceHolder holder) throws InterruptedException {
 		if (mCamera == null) {
