@@ -3,7 +3,6 @@ package com.bubblebot;
 import java.util.LinkedList;
 
 import android.app.Activity;
-import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -21,7 +20,6 @@ import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
@@ -36,7 +34,8 @@ import com.opencv.camera.NativeProcessor.PoolCallback;
 import com.opencv.jni.image_pool;
 import com.opencv.opengl.GL2CameraViewer;
 
-public class BubbleCollect extends Activity implements SensorEventListener, PictureSavedCallback {
+public class BubbleCollect extends Activity implements SensorEventListener,
+		PictureSavedCallback {
 
 	// Default Canny threshold and threshold2 multiplier
 	static private double c_CannyMultiplier = 2.5;
@@ -64,30 +63,26 @@ public class BubbleCollect extends Activity implements SensorEventListener, Pict
 
 	// GL view for OpenCV previewer
 	private GL2CameraViewer glview;
-	
-	private ProgressDialog progDlg = null;
-	
+
 	private final Handler mHandler = new Handler();
-	
+
 	private final Runnable mTakePhoto = new Runnable() {
-		public void run()
-		{
+		public void run() {
 			mPreview.takePicture();
 		}
 	};
-	
 
 	public void OnPictureSaved(String filename) {
-		//Start activity to handle actions after taking photo
+		// Start activity to handle actions after taking photo
 		Intent intent = new Intent(getApplication(), AfterPhotoTaken.class);
 		intent.putExtra("file", filename);
-		Log.i("BubbleCollect", "Starting AfterPhotoTaken activity with " + filename + "...");
+		Log.i("BubbleCollect", "Starting AfterPhotoTaken activity with "
+				+ filename + "...");
 		startActivity(intent);
 		finish();
 	}
-	
-	private void takePhoto()
-	{
+
+	private void takePhoto() {
 		mHandler.post(mTakePhoto);
 	}
 
@@ -97,11 +92,8 @@ public class BubbleCollect extends Activity implements SensorEventListener, Pict
 
 		public void process(int idx, image_pool pool, long timestamp,
 				NativeProcessor nativeProcessor) {
-			if (1 == mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
-					* c_CannyMultiplier))
-			{
-				takePhoto();
-			}
+			mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
+					* c_CannyMultiplier);
 		}
 	}
 
@@ -205,19 +197,6 @@ public class BubbleCollect extends Activity implements SensorEventListener, Pict
 		});
 		buttons.addView(capture_button);
 
-		// Add the manual focus button to view
-		Button focus_button = new Button(getApplicationContext());
-		focus_button.setLayoutParams(new LayoutParams(
-				LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-		focus_button.setText("Focus");
-		focus_button.setOnClickListener(new View.OnClickListener() {
-
-			public void onClick(View v) {
-				mPreview.postautofocus(100);
-			}
-		});
-		buttons.addView(focus_button);
-
 		// Add a new view for debug messages
 		LinearLayout debugView = new LinearLayout(getApplicationContext());
 		debugView.setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT,
@@ -230,11 +209,6 @@ public class BubbleCollect extends Activity implements SensorEventListener, Pict
 		frame.addView(buttons);
 		frame.addView(debugView);
 		setContentView(frame);
-		
-		progDlg = new ProgressDialog(this, ProgressDialog.STYLE_SPINNER);
-		progDlg.setIndeterminate(true);
-		progDlg.setMessage("Taking photo...");
-		progDlg.setCancelable(false);
 
 		// Use color camera
 		SharedPreferences settings = getApplication().getSharedPreferences(
@@ -333,9 +307,9 @@ public class BubbleCollect extends Activity implements SensorEventListener, Pict
 			}
 
 			// Show debug messages
-//			String s = String.format("%.2f %.2f %.2f", accel[0], accel[1],
-//					accel[2]);
-//			mDebugTextView.setText(s);
+			// String s = String.format("%.2f %.2f %.2f", accel[0], accel[1],
+			// accel[2]);
+			// mDebugTextView.setText(s);
 		}
 	}
 }
