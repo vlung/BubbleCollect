@@ -1,5 +1,6 @@
 package com.bubblebot;
 
+import java.util.Date;
 import java.util.LinkedList;
 
 import android.app.Activity;
@@ -12,6 +13,7 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.format.Time;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
@@ -54,6 +56,9 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	private TextView mDebugTextView = null;
 	private long mLastAutoFocusTime = 0;
 	private long mLastRefreshTime = 0;
+	
+	private long mCreateTime;
+	private long mTakePictureTime;
 
 	// final processor so that these processor callbacks can access it
 	private final Feedback mFeedback = new Feedback();
@@ -68,11 +73,16 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 
 	private final Runnable mTakePhoto = new Runnable() {
 		public void run() {
+			Time now = new Time();
+			now.setToNow();
+			mTakePictureTime = now.toMillis(true); 
 			mPreview.takePicture();
 		}
 	};
 
 	public void OnPictureSaved(String filename) {
+		double timeTaken = (double)(new Date().getTime() - mTakePictureTime) / 1000;
+		Log.i("BubbleCollect", "Take photo elapsed time:" + String.format("%.2f", timeTaken));
 		// Start activity to handle actions after taking photo
 		Intent intent = new Intent(getApplication(), AfterPhotoTaken.class);
 		intent.putExtra("file", filename);
@@ -92,6 +102,12 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 
 		public void process(int idx, image_pool pool, long timestamp,
 				NativeProcessor nativeProcessor) {
+			if (mCreateTime != 0)
+			{
+				double timeTaken = (double)(new Date().getTime() - mCreateTime) / 1000;
+				Log.i("BubbleCollect", "Init elapsed time:" + String.format("%.2f", timeTaken));
+				mCreateTime = 0;
+			}
 			mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
 					* c_CannyMultiplier);
 		}
@@ -146,6 +162,8 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		mCreateTime = new Date().getTime();
 
 		setFullscreen();
 		disableScreenTurnOff();

@@ -3,10 +3,9 @@ package com.opencv.camera;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-
-import junit.framework.Assert;
 
 import android.content.Context;
 import android.graphics.PixelFormat;
@@ -32,7 +31,6 @@ public class NativePreviewer extends SurfaceView implements
 	}
 
 	private PictureSavedCallback pictureSavedCallback = null;
-
 	private Handler mHandler = new Handler();
 
 	private boolean mHasAutoFocus = false;
@@ -48,6 +46,8 @@ public class NativePreviewer extends SurfaceView implements
 	private Boolean mFnExistSetPreviewCallbackWithBuffer = false;
 	private Method mFnAddCallbackBuffer = null;
 	private Method mFnSetPreviewCallbackWithBuffer = null;
+	
+	public long initTime;
 
 	private void init() {
 		// Install a SurfaceHolder.Callback so we get notified when the
@@ -257,12 +257,19 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	}
 
+	private Date start = null;
+	private long fcount = 0;
+	
 	/**
 	 * Demonstration of how to use onPreviewFrame. In this case I'm not
 	 * processing the data, I'm just adding the buffer back to the buffer queue
 	 * for re-use
 	 */
 	public void onPreviewFrame(byte[] data, Camera camera) {
+        if (start == null) {
+            start = new Date();
+        }
+
 		if (mProcessor.isActive()) {
 			if (mFnExistSetPreviewCallbackWithBuffer) {
 				mProcessor.post(data, mPreview_width, mPreview_height,
@@ -276,6 +283,14 @@ public class NativePreviewer extends SurfaceView implements
 			Log.i("NativePreviewer",
 					"Ignoring preview frame since processor is inactive.");
 		}
+		
+        fcount++;
+        if (fcount % 100 == 0) {
+            double ms = (new Date()).getTime() - start.getTime();
+            Log.i("NativePreviewer", "fps:" + fcount / (ms / 1000.0));
+            start = new Date();
+            fcount = 0;
+        }
 	}
 
 	public void onDoneNativeProcessing(byte[] buffer) {

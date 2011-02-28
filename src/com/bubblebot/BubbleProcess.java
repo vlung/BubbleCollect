@@ -1,5 +1,7 @@
 package com.bubblebot;
 
+import java.util.Date;
+
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Intent;
@@ -16,6 +18,7 @@ public class BubbleProcess extends Activity  {
         private Activity parent;
         private ProgressDialog dialog;
         private String filename;
+        private long startTime;
 
         // Constructor
         public ProcessFormTask(Activity parent) {
@@ -27,6 +30,7 @@ public class BubbleProcess extends Activity  {
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
+            startTime = new Date().getTime();
             dialog = new ProgressDialog(parent);
             dialog.setMessage(getResources().getText(com.bubblebot.R.string.ProcessForm));
             dialog.setIndeterminate(true);
@@ -38,6 +42,10 @@ public class BubbleProcess extends Activity  {
         @Override
         protected void onPostExecute(Void result) {
             super.onPostExecute(result);
+            
+            double timeTaken = (double)(new Date().getTime() - startTime) / 1000;
+    		Log.i("BubbleProcess", "Process form elapsed time:" + String.format("%.2f", timeTaken));
+            
             dialog.dismiss();
             parent.finish();
             

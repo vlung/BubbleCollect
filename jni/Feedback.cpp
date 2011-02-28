@@ -202,10 +202,10 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 				}
 
 				// If cosines of all angles are small
-				// (ie. all angles are between 75-105 degree),
+				// (ie. all angles are between 70-110 degree),
 				// this quadrilateral becomes the largest one
 				// we have detected so far.
-				if (maxCosine < 0.25) {
+				if (maxCosine < 0.34) {
 					maxRect = approx;
 					maxContourArea = area;
 					if (nMatchCorners == 2 && area > c_minOutlineArea) {
