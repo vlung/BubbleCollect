@@ -12,5 +12,7 @@ public:
   virtual ~Processor();
 
   char* ProcessForm(char* filename);
+  CvPoint* findCornerPoints(IplImage* img);
+  void warpImage(IplImage* img, IplImage* warpImg, CvPoint * cornerPoints);
 private:
 };
