@@ -27,4 +27,6 @@ public:
   	char* ProcessForm(char* filename);
   	CvPoint* findCornerPoints(IplImage* img);
   	void warpImage(IplImage* img, IplImage* warpImg, CvPoint * cornerPoints);
+  	CvPoint* findBubbles(IplImage* img);
+  	CvPoint * findLineValues(IplImage* img);
 };
