@@ -1,2 +1,4 @@
 BubbleCollect-debug-1.apk 
 Added logging for feedback init time, feedback FPS, photo taking elapsed time and process form elapsed time.
+BubbleCollect-debug-2.apk 
+Added variable color feedback border and scoring. Added auto take photo.
