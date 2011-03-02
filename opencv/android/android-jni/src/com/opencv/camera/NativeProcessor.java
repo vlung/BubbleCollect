@@ -11,37 +11,37 @@ import android.util.Log;
 import com.opencv.jni.image_pool;
 import com.opencv.jni.opencv;
 
-/** The NativeProcessor is a native processing stack engine.
+/**
+ * The NativeProcessor is a native processing stack engine.
  * 
- * What this means is that the NativeProcessor handles loading
- * live camera frames into native memory space, i.e. the image_pool
- * and then calling a stack of PoolCallback's and passing them the
- * image_pool.
+ * What this means is that the NativeProcessor handles loading live camera
+ * frames into native memory space, i.e. the image_pool and then calling a stack
+ * of PoolCallback's and passing them the image_pool.
  * 
  * The image_pool index 0 is populated with the live video image
  * 
- * And any modifications to this the pool are in place, so you may
- * pass on changes to the pool to the next PoolCallback in the stack.
- *
+ * And any modifications to this the pool are in place, so you may pass on
+ * changes to the pool to the next PoolCallback in the stack.
+ * 
  */
 public class NativeProcessor {
-	
-	/** Users that would like to be able to have access to live video frames
-	 * should implement a PoolCallback
-	 * the idx and pool contain the images, specifically at idx == 0 is the
-	 * live video frame.
+
+	/**
+	 * Users that would like to be able to have access to live video frames
+	 * should implement a PoolCallback the idx and pool contain the images,
+	 * specifically at idx == 0 is the live video frame.
 	 */
 	static public interface PoolCallback {
 		void process(int idx, image_pool pool, long timestamp,
 				NativeProcessor nativeProcessor);
 	}
 
-	
-
-	/**At every frame, each PoolCallback is called in order and is passed the
+	/**
+	 * At every frame, each PoolCallback is called in order and is passed the
 	 * the same pool and index
 	 * 
-	 * @param stack  A list of PoolCallback objects, that will be called in order
+	 * @param stack
+	 *            A list of PoolCallback objects, that will be called in order
 	 */
 	public void addCallbackStack(LinkedList<PoolCallback> stack) {
 
@@ -74,26 +74,28 @@ public class NativeProcessor {
 		gray_scale_only = false;
 	}
 
-	
-	
-	/** Grayscale only is much faster because the yuv does not get decoded, and grayscale is only one
-	 * byter per pixel - giving fast opengl texture loading.
+	/**
+	 * Grayscale only is much faster because the yuv does not get decoded, and
+	 * grayscale is only one byter per pixel - giving fast opengl texture
+	 * loading.
 	 * 
-	 * You still have access to the whole yuv image, but grayscale is only immediately available to
-	 * use without further effort.
+	 * You still have access to the whole yuv image, but grayscale is only
+	 * immediately available to use without further effort.
 	 * 
-	 * Suggestion - use grayscale only and save your yuv images to disk if you would like color images
+	 * Suggestion - use grayscale only and save your yuv images to disk if you
+	 * would like color images
 	 * 
-	 * Also, in grayscale mode, the images in the pool are only single channel, so please keep this in mind
-	 * when accessing the color images - check the cv::Mat::channels() or cv::Mat::type() if your messing
-	 * with color channels
+	 * Also, in grayscale mode, the images in the pool are only single channel,
+	 * so please keep this in mind when accessing the color images - check the
+	 * cv::Mat::channels() or cv::Mat::type() if your messing with color
+	 * channels
 	 * 
-	 * @param grayscale true if you want to only process grayscale images
+	 * @param grayscale
+	 *            true if you want to only process grayscale images
 	 */
-	public void setGrayscale(boolean grayscale){
+	public void setGrayscale(boolean grayscale) {
 		gray_scale_only = grayscale;
 	}
-	
 
 	/**
 	 * A callback that allows the NativeProcessor to pass back the buffer when
@@ -110,7 +112,6 @@ public class NativeProcessor {
 		void onDoneNativeProcessing(byte[] buffer);
 	}
 
-	
 	protected void stop() {
 		mthread.interrupt();
 		try {
@@ -126,12 +127,11 @@ public class NativeProcessor {
 		mthread = new ProcessorThread();
 		mthread.start();
 	}
-	
-	public boolean isActive()
-	{
+
+	public boolean isActive() {
 		return (mthread != null);
 	}
-	
+
 	/**
 	 * post is used to notify the processor that a preview frame is ready, this
 	 * will return almost immediately. if the processor is busy, returns false
@@ -164,7 +164,7 @@ public class NativeProcessor {
 		return true;
 
 	}
-	
+
 	private class ProcessorThread extends Thread {
 
 		private void process(NPPostObject pobj) throws Exception {
@@ -249,7 +249,22 @@ public class NativeProcessor {
 		}
 
 	}
-	
+
+	public void clearQueue() {
+		try {
+			while (!lock.tryLock(50, TimeUnit.MILLISECONDS)) {
+			}
+			try {
+				postobjects.clear();
+			} finally {
+				lock.unlock();
+
+			}
+		} catch (Exception e) {
+			Log.e("NativeProcessor", "clearQueue error", e);
+		}
+	}
+
 	static private class NPPostObject {
 		public NPPostObject(byte[] buffer, int width, int height, int format,
 				long timestamp, NativeProcessorCallback callback) {
@@ -273,7 +288,6 @@ public class NativeProcessor {
 		NativeProcessorCallback callback;
 	}
 
-
 	private LinkedList<NPPostObject> postobjects = new LinkedList<NPPostObject>();
 
 	private image_pool pool = new image_pool();
@@ -282,11 +296,11 @@ public class NativeProcessor {
 
 	private LinkedList<PoolCallback> stack = new LinkedList<PoolCallback>();
 	private boolean gray_scale_only;
-	
+
 	private Lock stacklock = new ReentrantLock();
 
 	private LinkedList<PoolCallback> nextStack;
-	
+
 	private ProcessorThread mthread;
 
 }

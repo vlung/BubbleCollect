@@ -13,7 +13,7 @@ Feedback::~Feedback() {
 
 // How far do we allow a point to be away from the corner
 // markers to consider it touches the template
-const int c_cornerRange = 50;
+const int c_cornerRange = 20;
 
 // Specify the size of the form template
 const int c_templateHeight = 440;
@@ -25,8 +25,10 @@ const int c_borderThreshold = 50;
 const char* const c_pszCorrectPos = "Correct Position";
 const char* const c_pszRotateLeft = "ROTATE LEFT";
 const char* const c_pszRotateRight = "ROTATE RIGHT";
-const char* const c_pszMoveCloser = "MOVE TOWARDS YOU";
-const char* const c_pszMoveAway = "MOVE AWAY FROM FORM";
+const char* const c_pszMoveCloser = "CENTER THE FORM";
+const char* const c_pszScore = "SCORE:";
+
+int g_iScore = 0;
 
 enum Side {
 	None = -1, Top, Right, Bottom, Left
@@ -51,10 +53,14 @@ float angle(Point pt1, Point pt2, Point pt0) {
 }
 
 // Evaluate whether a point is close to the corner markers
-bool isNear(const Point &p) {
-	return ((abs(p.x - g_ptUpperLeft.x) < c_cornerRange && abs(p.y
-			- g_ptUpperLeft.y) < c_cornerRange) || (abs(p.x - g_ptLowerRight.x)
-			< c_cornerRange && abs(p.y - g_ptLowerRight.y) < c_cornerRange));
+bool isNear(const Point &p, int &iDist) {
+	int iDistUL = sqrt(pow(p.x - g_ptUpperLeft.x, 2) + pow(p.y
+			- g_ptUpperLeft.y, 2));
+	int iDistLR = sqrt(pow(p.x - g_ptLowerRight.x, 2) + pow(p.y
+			- g_ptLowerRight.y, 2));
+
+	iDist = min(iDistUL, iDistLR);
+	return (iDist < c_cornerRange);
 }
 
 Side checkBorder(const Point &p) {
@@ -87,13 +93,13 @@ void checkContour(Mat &mat, const vector<Point> &contour) {
 				g_nAcross += len;
 				const Point* p = &contour[0];
 				int n = contour.size();
-				polylines(mat, &p, &n, 1, false, Scalar(255, 0, 0), 3);
+				polylines(mat, &p, &n, 1, false, Scalar(0xa5, 0x2a, 0x2a), 2);
 			} else {
 				Side sideTopBottom = (side1 % 2 == 0) ? side1 : side2;
 				Side sideLeftRight = (side1 % 2 == 1) ? side1 : side2;
 				const Point* p = &contour[0];
 				int n = contour.size();
-				polylines(mat, &p, &n, 1, false, Scalar(255, 0, 0), 3);
+				polylines(mat, &p, &n, 1, false, Scalar(0xa5, 0x2a, 0x2a), 2);
 				if (sideTopBottom == Top) {
 					if (sideLeftRight == Right) {
 						g_nTopRight = max(g_nTopRight, len);
@@ -121,7 +127,7 @@ void checkContour(Mat &mat, const vector<Point> &contour) {
 
 			const Point* p = &contour[0];
 			int n = contour.size();
-			polylines(mat, &p, &n, 1, false, Scalar(0, 0, 255), 3);
+			polylines(mat, &p, &n, 1, false, Scalar(0xa5, 0x2a, 0x2a), 2);
 		}
 	}
 }
@@ -133,8 +139,6 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	Mat img = pool->getImage(idx), imgCanny;
 	int result = 0;
 
-//	LOGI("Entering DetectOutline");
-
 	// Leave if there is no image
 	if (img.empty()) {
 		LOGE("Failed to get image");
@@ -145,8 +149,9 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 	vector < Point > maxRect;
 	vector < vector<Point> > contours;
 	vector < vector<Point> > borderContours;
-	float maxContourArea = 10000;
+	float maxContourArea = 50000;
 	bool fOutlineDetected = false;
+	int iScore = 0;
 
 	// Initialize the number of rows (height) of the image
 	if (g_maxRows == -1) {
@@ -190,6 +195,8 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 			// that we have detected.
 			if (area > maxContourArea) {
 				float maxCosine = 0;
+				int iDist;
+				int iDistLow1 = 10000, iDistLow2 = 10000;
 
 				// Find the maximum cosine of the angle between joint edges
 				// and check if the quadrilateral touches the corner markers
@@ -197,33 +204,49 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 					float cosine = fabs(angle(approx[j % 4], approx[j - 2],
 							approx[j - 1]));
 					maxCosine = MAX(maxCosine, cosine);
-					if (isNear(approx[j % 4]))
+					if (isNear(approx[j % 4], iDist)) {
 						++nMatchCorners;
+					}
+					if (iDist < iDistLow1) {
+						iDistLow1 = iDist;
+					} else if (iDist < iDistLow2) {
+						iDistLow2 = iDist;
+					}
 				}
 
 				// If cosines of all angles are small
-				// (ie. all angles are between 70-110 degree),
+				// (ie. all angles are between 65-115 degree),
 				// this quadrilateral becomes the largest one
 				// we have detected so far.
-				if (maxCosine < 0.34) {
+				if (maxCosine < 0.42) {
 					maxRect = approx;
 					maxContourArea = area;
-					if (nMatchCorners == 2 && area > c_minOutlineArea) {
-						fOutlineDetected = true;
-						result = 1;
-					}
+					iDist = (iDistLow1 + iDistLow2) / 2;
+					iScore = max(iScore, 100 - min(100, (int) sqrt((iDist
+							- c_cornerRange) * 25.0)));
 				}
 			}
 		}
 	}
 
+	if (iScore > 0) {
+		g_iScore = (g_iScore + iScore) / 2;
+	} else {
+		g_iScore *= 0.95;
+	}
+
+	if (g_iScore >= 80) {
+		fOutlineDetected = true;
+		result = 1;
+	}
+
 	// Draw corner markers
 	const Point* p = &maxRect[0];
 	int n = (int) maxRect.size();
-	Scalar guideColor = fOutlineDetected ? Scalar(0, 255, 0)
-			: Scalar(255, 0, 0);
+	float gradient = exp(-((float) (100 - g_iScore) / 100.0));
+	Scalar guideColor = Scalar(255 - 255 * gradient, 220 * gradient, 0);
 	polylines(img, &p, &n, 1, true, guideColor, 3, CV_AA);
-	rectangle(img, g_ptUpperLeft, g_ptLowerRight, guideColor, 1, CV_AA);
+	rectangle(img, g_ptUpperLeft, g_ptLowerRight, guideColor, 2, CV_AA);
 
 	// Draw Status text
 	const char *pszMsg = NULL;
@@ -244,35 +267,43 @@ int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,
 			} else {
 				pszMsg = c_pszRotateRight;
 			}
-		} else if (maxContourArea > 10000 && maxContourArea < 150000) {
-			pszMsg = c_pszMoveAway;
 		}
 	}
-
 	if (pszMsg != NULL)
-		drawText(idx, pool, pszMsg, -2, color, 1.6);
+		drawText(idx, pool, pszMsg, -2, 0, color, 1.6);
 
-	// Draw debug text
-//	char txt[100];
-//	sprintf(txt, "A%d C%.2f", g_nAcross, thres1);
-//	drawText(idx, pool, txt, -1);
-
-//	LOGI("Exiting DetectOutline");
+	// Draw Score
+	char pszTxt[10];
+	drawText(idx, pool, c_pszScore, -6, 1, guideColor);
+	sprintf(pszTxt, "%d%%", g_iScore);
+	drawText(idx, pool, pszTxt, -1, 1, guideColor, 2.0);
 
 	return result;
 }
 
 // Draw text on screen
 void Feedback::drawText(int i, image_pool* pool, const char* ctext, int row,
-		const cv::Scalar &color, double fontScale, double thickness) {
+		int hJust, const cv::Scalar &color, double fontScale, double thickness) {
 	int fontFace = FONT_HERSHEY_COMPLEX_SMALL;
 	Mat img = pool->getImage(i);
 	string text = ctext;
 	Size textSize = getTextSize(text, fontFace, fontScale, thickness, NULL);
 
 	// Center the text
-	Point textOrg((img.cols - textSize.width) / 2, (row > 0) ? (textSize.height
-			* row) : (img.rows + (row * textSize.height)));
+	int x;
+	switch (hJust) {
+	case -1:
+		x = 10;
+		break;
+	case 0:
+		x = (img.cols - textSize.width) / 2;
+		break;
+	case 1:
+		x = img.cols - textSize.width - 10;
+		break;
+	}
+	Point textOrg(x, (row > 0) ? (textSize.height * row) : (img.rows + (row
+			* textSize.height)));
 
 	// Draw a black border for the text and then draw the text
 	putText(img, text, textOrg, fontFace, fontScale, Scalar::all(0), thickness

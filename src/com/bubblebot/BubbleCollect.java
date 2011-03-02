@@ -26,6 +26,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.bubblebot.jni.Feedback;
 import com.opencv.camera.CameraConfig;
@@ -47,8 +48,8 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	static private float c_StationaryThreshold = 0.25F;
 	// Refresh accelerometer reading no less than .5 seconds
 	static private long c_AccelrefreshInterval = 500000000L;
-	// Auto focus no more than once every 5 seconds
-	static private long c_AutoFocusInterval = 5000000000L;
+	// Auto focus no more than once every 3 seconds
+	static private long c_AutoFocusInterval = 3000000000L;
 	private final float alpha = (float) 0.8;
 	private float[] mAccelMA = new float[3];
 	private float[] mGravity = new float[3];
@@ -79,6 +80,11 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 			mPreview.takePicture();
 		}
 	};
+	
+	private void ShowHelp()
+	{
+		Toast.makeText(this, R.string.BubbleCollect_help_toast, Toast.LENGTH_LONG).show();
+	}
 
 	public void OnPictureSaved(String filename) {
 		double timeTaken = (double)(new Date().getTime() - mTakePictureTime) / 1000;
@@ -108,8 +114,12 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 				Log.i("BubbleCollect", "Init elapsed time:" + String.format("%.2f", timeTaken));
 				mCreateTime = 0;
 			}
-			mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
-					* c_CannyMultiplier);
+			// Automatically take photo when the form is correctly positioned.
+			if (1 == mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
+					* c_CannyMultiplier))
+			{
+				takePhoto();
+			}
 		}
 	}
 
@@ -134,9 +144,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	// Create options menu
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
-		menu.add("*2");
-		menu.add("+20");
-		menu.add("-50");
+		menu.add("Help");
 		menu.add("Settings");
 		return true;
 	}
@@ -144,12 +152,8 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	// Handle options menu actions
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
-		if (item.getTitle().equals("+20")) {
-			mCannyThres1 += 20;
-		} else if (item.getTitle().equals("-50")) {
-			mCannyThres1 -= 50;
-		} else if (item.getTitle().equals("*2")) {
-			mCannyThres1 *= 2;
+		if (item.getTitle().equals("Help")) {
+			ShowHelp();
 		} else if (item.getTitle().equals("Settings")) {
 			// Start the CameraConfig activity for camera settings
 			Intent intent = new Intent(this, CameraConfig.class);
@@ -234,6 +238,8 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		Editor editor = settings.edit();
 		editor.putInt(CameraConfig.CAMERA_MODE, CameraConfig.CAMERA_MODE_COLOR);
 		editor.commit();
+		
+		ShowHelp();
 	}
 
 	@Override

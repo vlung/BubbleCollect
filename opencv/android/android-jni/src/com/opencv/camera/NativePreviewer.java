@@ -6,6 +6,7 @@ import java.lang.reflect.Method;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.content.Context;
 import android.graphics.PixelFormat;
@@ -34,7 +35,7 @@ public class NativePreviewer extends SurfaceView implements
 	private Handler mHandler = new Handler();
 
 	private boolean mHasAutoFocus = false;
-	private boolean mIsPreview = false;
+	private AtomicBoolean mIsPreview = new AtomicBoolean(false);
 	private SurfaceHolder mHolder;
 	private Camera mCamera;
 	private NativeProcessor mProcessor;
@@ -150,12 +151,13 @@ public class NativePreviewer extends SurfaceView implements
 		try {
 			// Indicate that we are not in preview mode anymore
 			// so we will ignore any autofocus event
-			mIsPreview = false;
 			mHandler.removeCallbacks(autofocusrunner);
+			mIsPreview.set(false);
 			// Clear preview callback. Otherwise, camera will
 			// use the preview buffer for saving the photo and it
 			// will fail because the buffer is not big enough.
 			mCamera.setPreviewCallback(null);
+			mProcessor.clearQueue();
 			mCamera.takePicture(null, null, this);
 		} catch (Exception e) {
 			Log.e("NativePreviewer", "takePicture", e);
@@ -247,7 +249,7 @@ public class NativePreviewer extends SurfaceView implements
 
 		setPreviewCallbackBuffer();
 		mCamera.startPreview();
-		mIsPreview = true;
+		mIsPreview.set(true);
 	}
 
 	public void postautofocus(int delay) {
@@ -315,8 +317,9 @@ public class NativePreviewer extends SurfaceView implements
 	 */
 	public void onPause() {
 		try {
-			mIsPreview = false;
+			mIsPreview.set(false);
 			mCamera.setPreviewCallback(null);
+			mProcessor.clearQueue();
 			mCamera.stopPreview();
 			addCallbackStack(null);
 		} catch (Exception e) {
@@ -337,7 +340,7 @@ public class NativePreviewer extends SurfaceView implements
 		mProcessor.start();
 		setPreviewCallbackBuffer();
 		mCamera.startPreview();
-		mIsPreview = true;
+		mIsPreview.set(true);
 	}
 
 	private void setPreviewCallbackBuffer() {
@@ -370,7 +373,7 @@ public class NativePreviewer extends SurfaceView implements
 
 	private Runnable autofocusrunner = new Runnable() {
 		public void run() {
-			if (mIsPreview)
+			if (mIsPreview.get())
 			{
 				mCamera.autoFocus(autocallback);
 			}

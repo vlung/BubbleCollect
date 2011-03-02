@@ -29,4 +29,5 @@
 							be able to view both the textual data collected and the image displaying which bubbles were recognized by the
 							computer vision algorithm.  You may retake the picture from here as well.</string>
 <string name="ViewFormsText">Select a form to view:</string>
+<string name="BubbleCollect_help_toast">Match the form to the red rectangle.\nA picture will be taken automatically when the rectangle turns bright green.</string>
 </resources>
