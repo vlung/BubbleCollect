@@ -158,13 +158,6 @@ public class NativePreviewer extends SurfaceView implements
 			// will fail because the buffer is not big enough.
 			mCamera.setPreviewCallback(null);
 			mProcessor.clearQueue();
-			// Enable auto focus
-			Camera.Parameters parameters = mCamera.getParameters();
-			if (mHasAutoFocus)
-			{
-				parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
-			}
-			mCamera.setParameters(parameters);
 			mCamera.takePicture(null, null, this);
 		} catch (Exception e) {
 			Log.e("NativePreviewer", "takePicture", e);
@@ -437,19 +430,6 @@ public class NativePreviewer extends SurfaceView implements
 
 	public void setGrayscale(boolean b) {
 		mProcessor.setGrayscale(b);
-	}
-	
-	public List<String> getCameraSceneModes()
-	{
-		Camera.Parameters parameters = mCamera.getParameters();
-		return parameters.getSupportedSceneModes();
-	}
-	
-	public void setCameraSceneMode(String mode)
-	{
-		Camera.Parameters parameters = mCamera.getParameters();
-		parameters.setSceneMode(mode);
-		mCamera.setParameters(parameters);
 	}
 
 }
