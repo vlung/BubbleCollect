@@ -18,6 +18,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.SubMenu;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
@@ -146,6 +147,9 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	public boolean onCreateOptionsMenu(Menu menu) {
 		menu.add("Help");
 		menu.add("Settings");
+		SubMenu sub1 = menu.addSubMenu("Sub");
+		sub1.add("Test1");
+		sub1.add("Test2");
 		return true;
 	}
 
@@ -158,6 +162,10 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 			// Start the CameraConfig activity for camera settings
 			Intent intent = new Intent(this, CameraConfig.class);
 			startActivity(intent);
+		}
+		else
+		{
+			Toast.makeText(this, item.getTitle(), Toast.LENGTH_LONG).show();
 		}
 		return true;
 	}
