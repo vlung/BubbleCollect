@@ -16,8 +16,8 @@ Feedback::~Feedback() {
 const int c_cornerRange = 20;
 
 // Specify the size of the form template
-const int c_templateHeight = 440;
-const int c_templateWidth = c_templateHeight / 8.5 * 11;
+const int c_templateHeight = 360;
+const int c_templateWidth = c_templateHeight / 5.5 * 8.5;
 
 const int c_borderMargin = 10;
 const int c_borderThreshold = 50;

@@ -1,5 +1,7 @@
 package com.bubblebot;
 
+import java.io.File;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -40,6 +42,9 @@ public class AfterPhotoTaken extends Activity {
 		retake = (Button) findViewById(R.id.retake_button);
 		retake.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
+				// Delete photo
+				File photoFile = new File(dir + filename);
+				photoFile.delete();
 				// Start process form algorithm
 				Intent intent = new Intent(getApplication(),
 						BubbleCollect.class);
@@ -59,5 +64,13 @@ public class AfterPhotoTaken extends Activity {
 				finish();
 			}
 		});
+	}
+
+	@Override
+	public void onBackPressed() {
+		super.onBackPressed();
+		// Delete photo
+		File photoFile = new File(dir + filename);
+		photoFile.delete();
 	}
 }
