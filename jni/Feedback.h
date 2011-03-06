@@ -12,6 +12,7 @@ public:
   Feedback();
   virtual ~Feedback();
 
+  void ResetScore();
   int DetectOutline(int idx, image_pool *pool, double thres1, double thres2);
 
   void drawText(int i, image_pool* pool, const char* ctext, int row = -2, int hJust = 0, const cv::Scalar &color = cv::Scalar::all(255),

@@ -24,8 +24,8 @@ public:
 	Processor();
 	virtual ~Processor();
 
-  	char* ProcessForm(char* filename);
-  	CvPoint* findCornerPoints(IplImage* img);
+  	char* ProcessForm(char* filename); 
+	bool DetectOutline(char* filename, bool fIgnoreDatFile = false);
   	void warpImage(IplImage* img, IplImage* warpImg, CvPoint * cornerPoints);
   	CvPoint* findBubbles(IplImage* img);
   	CvPoint * findLineValues(IplImage* img);

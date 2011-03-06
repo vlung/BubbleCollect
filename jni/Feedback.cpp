@@ -132,6 +132,11 @@ void checkContour(Mat &mat, const vector<Point> &contour) {
 	}
 }
 
+void Feedback::ResetScore()
+{
+	g_iScore = 0;
+}
+
 // Detect whether the largest rectangle of an image is well aligned
 // with the corner markers on screen
 int Feedback::DetectOutline(int idx, image_pool *pool, double thres1,

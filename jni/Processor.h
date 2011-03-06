@@ -3,6 +3,8 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui_c.h>
 #include <opencv2/imgproc/imgproc_c.h>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/legacy/compat.hpp>
 #include <list>
 
@@ -13,7 +15,8 @@ public:
   virtual ~Processor();
 
   char* ProcessForm(char* filename);
-  CvPoint* findCornerPoints(IplImage* img);
+  bool DetectOutline(char* filename, bool fIgnoreDatFile = false);
+  bool DetectOutline(char* filename, bool fIgnoreDatFile, cv::Rect &r);
   void warpImage(IplImage* img, IplImage* warpImg, CvPoint * cornerPoints);
   CvPoint* findBubbles(IplImage* img);
   CvPoint * findLineValues(IplImage* img);

@@ -265,6 +265,8 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		sensorManager.registerListener(this,
 				sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
 				SensorManager.SENSOR_DELAY_NORMAL);
+		
+		mFeedback.ResetScore();
 
 		glview.onResume();
 		mPreview.setParamsFromPrefs(getApplicationContext());
