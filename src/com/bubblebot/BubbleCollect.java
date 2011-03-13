@@ -37,6 +37,11 @@ import com.opencv.camera.NativeProcessor.PoolCallback;
 import com.opencv.jni.image_pool;
 import com.opencv.opengl.GL2CameraViewer;
 
+/* BubbleCollect activity
+ * 
+ * This activity starts the camera in preview mode and displays visual feedback
+ * to guide the user to position the form correctly.
+ */
 public class BubbleCollect extends Activity implements SensorEventListener,
 		PictureSavedCallback {
 
@@ -52,14 +57,18 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	static private long c_AutoFocusInterval = 3000000000L;
 	// Auto focus once every 3 frames
 	static private float c_AutoFocusFrame = 3;
+	// Members for storing accelerometer data
 	private final float alpha = (float) 0.8;
 	private float[] mAccelMA = new float[3];
 	private float[] mGravity = new float[3];
 	private boolean mStationary = false;
+	// Textview for displaying debug information
 	private TextView mDebugTextView = null;
+	// Keep track of the last time when the camera auto focused
 	private long mLastAutoFocusTime = 0;
+	// Keep track of the last time when we got the accelerometer data
 	private long mLastRefreshTime = 0;
-
+	// Keep track of init time and picture taken time for perf measurement
 	private long mCreateTime;
 	private long mTakePictureTime;
 
@@ -72,8 +81,10 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	// GL view for OpenCV previewer
 	private GL2CameraViewer glview;
 
+	// A handler for sending commands to the UI thread
 	private final Handler mHandler = new Handler();
 
+	// A task used for taking a picture
 	private final Runnable mTakePhoto = new Runnable() {
 		public void run() {
 			Time now = new Time();
@@ -83,11 +94,14 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		}
 	};
 
+	// This function displays a toast on screen for help information 
 	private void ShowHelp() {
 		Toast.makeText(this, R.string.BubbleCollect_help_toast,
 				Toast.LENGTH_LONG).show();
 	}
 
+	// This is a callback function that is called by the NativePreviewer component when
+	// the JPEG image of the photo is saved
 	public void OnPictureSaved(String filename) {
 		double timeTaken = (double) (new Date().getTime() - mTakePictureTime) / 1000;
 		Log.i("BubbleCollect",
@@ -101,12 +115,13 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		finish();
 	}
 
+	// This function schedules a take photo action on the UI thread
 	private void takePhoto() {
 		mHandler.post(mTakePhoto);
 	}
 
-	// The OutlineProcessor guides the user to align the camera properly
-	// for capturing a bubble form image
+	// The OutlineProcessor guides the user to position the camera properly
+	// for capturing a bubble form
 	class OutlineProcessor implements NativeProcessor.PoolCallback {
 
 		public void process(int idx, image_pool pool, long timestamp,
@@ -209,6 +224,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		buttons.setGravity(Gravity.RIGHT);
 		buttons.setOrientation(1);
 
+		// Add manual take picture button to screen
 		ImageButton capture_button = new ImageButton(getApplicationContext());
 		capture_button.setImageDrawable(getResources().getDrawable(
 				android.R.drawable.ic_menu_camera));
@@ -241,6 +257,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		editor.putInt(CameraConfig.CAMERA_MODE, CameraConfig.CAMERA_MODE_COLOR);
 		editor.commit();
 
+		// Display toast for help information
 		ShowHelp();
 	}
 
@@ -281,7 +298,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		mPreview.onResume();
 	}
 
-	// We don't need to track accuracy but we must override this fuction to
+	// We don't need to track accuracy but we must override this function to
 	// avoid compiler error.
 	public void onAccuracyChanged(Sensor arg0, int arg1) {
 	}
@@ -335,7 +352,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 				mStationary = true;
 			}
 
-			// Show debug messages
+			// Show debug messages for accelerometer readings
 //			String s = String.format("%.2f %.2f %.2f", accel[0], accel[1],
 //					accel[2]);
 //			mDebugTextView.setText(s);

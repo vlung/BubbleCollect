@@ -11,6 +11,10 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+/* DisplayProcessedForm activity
+ * 
+ * This activity displays the image of a processed form
+ */
 public class DisplayProcessedForm extends Activity {
 	
 	ImageView image;
@@ -22,6 +26,7 @@ public class DisplayProcessedForm extends Activity {
 	//TODO: Find a way to get the relevant filename
 	String filename = "";
 	
+	// Set up the UI and load the processed image
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
        super.onCreate(savedInstanceState);

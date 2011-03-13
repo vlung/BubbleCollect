@@ -5,6 +5,12 @@
 
 using namespace cv;
 
+/* Feedback
+ *
+ * This class receives an image of a preview frame and detects the form
+ * in the image. It will overlay visual feedback on the image and returns
+ * that to the caller.
+ */
 Feedback::Feedback() {
 }
 
@@ -63,6 +69,7 @@ bool isNear(const Point &p, int &iDist) {
 	return (iDist < c_cornerRange);
 }
 
+// This function checks whether a point is close to one of the 4 sides of the screen.
 Side checkBorder(const Point &p) {
 	Side result = None;
 
@@ -77,9 +84,17 @@ Side checkBorder(const Point &p) {
 	return result;
 }
 
+// This function checks whether a contour (a set of points) touches
+// multiple sides of the screen. If so, it uses some heuristics to
+// decide whether the contour represents a form that is too close
+// to the camera or whether the form is skewed.
 void checkContour(Mat &mat, const vector<Point> &contour) {
 	if (g_fMoveForm)
 		return;
+	// If there are 2 points in the contour, checks whether it touches
+	// 2 opposing sides of the screen. If so, it may indicate that the
+	// form is too close. If they touches 2 adjacent sides of the screen,
+	// keep track of the sides they touch because they may indicate a skewed form.
 	if (contour.size() == 2) {
 		Side side1 = checkBorder(contour[0]);
 		Side side2 = checkBorder(contour[1]);
@@ -115,6 +130,8 @@ void checkContour(Mat &mat, const vector<Point> &contour) {
 				}
 			}
 		}
+	// If there are 3 or 4 points in the contour, check wether they represents
+	// a corner of the form cut off by the screen.
 	} else if (contour.size() == 3 || contour.size() == 4) {
 		int len = (int) arcLength(Mat(contour), false);
 		if (len < c_borderThreshold)
@@ -132,6 +149,8 @@ void checkContour(Mat &mat, const vector<Point> &contour) {
 	}
 }
 
+// This function resets the score displayed by feedback. It must be called
+// before each preview session to make sure the score is initialized to zero.
 void Feedback::ResetScore()
 {
 	g_iScore = 0;

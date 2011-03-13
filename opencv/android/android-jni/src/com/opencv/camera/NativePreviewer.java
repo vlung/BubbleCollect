@@ -23,32 +23,49 @@ import android.view.SurfaceView;
 import com.opencv.camera.NativeProcessor.NativeProcessorCallback;
 import com.opencv.camera.NativeProcessor.PoolCallback;
 
+/* NativePreviewer
+ * 
+ * This class sets up the camera in preview mode and sends the live camera feed
+ * to the NativeProcessor for processing. It also handles camera operations such
+ * as taking a picture and auto focusing.
+ */
 public class NativePreviewer extends SurfaceView implements
 		SurfaceHolder.Callback, Camera.PreviewCallback, Camera.PictureCallback,
 		Camera.AutoFocusCallback, NativeProcessorCallback {
 
+	// Declare a callback used to signal that the picture has been saved
 	public interface PictureSavedCallback {
 		void OnPictureSaved(String filename);
 	}
 
+	// Callback function to call when a picture is saved
 	private PictureSavedCallback pictureSavedCallback = null;
+	// Handler for sending commands to the UI thread
 	private Handler mHandler = new Handler();
 
+	// Camera information
 	private boolean mHasAutoFocus = false;
 	private AtomicBoolean mIsPreview = new AtomicBoolean(false);
 	private SurfaceHolder mHolder;
 	private Camera mCamera;
-	private NativeProcessor mProcessor;
-
 	private int mPreview_width, mPreview_height;
 	private int mPixelformat;
 
+	// An instance of NativeProcessor
+	private NativeProcessor mProcessor;
+	
+	// Preview information
 	private byte[] mPreviewBuffer = null;
 	private Boolean mFnExistSetPreviewCallbackWithBuffer = false;
 	private Method mFnAddCallbackBuffer = null;
 	private Method mFnSetPreviewCallbackWithBuffer = null;
 	private double mFramePerSec = 1;
+	
+	// Keep track on frame rate
+	private Date start = null;
+	private long fcount = 0;
 
+	// Keep track of initialization time for perf measurement
 	public long initTime;
 
 	private void init() {
@@ -87,6 +104,7 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	}
 
+	// Constructor
 	public NativePreviewer(Context context, AttributeSet attributes,
 			PictureSavedCallback callback) {
 		super(context, attributes);
@@ -103,15 +121,7 @@ public class NativePreviewer extends SurfaceView implements
 				"preview_height", 600);
 	}
 
-	/**
-	 * 
-	 * @param context
-	 * @param preview_width
-	 *            the desired camera preview width - will attempt to get as
-	 *            close to this as possible
-	 * @param preview_height
-	 *            the desired camera preview height
-	 */
+	// Constructor
 	public NativePreviewer(Context context, int preview_width,
 			int preview_height, PictureSavedCallback callback) {
 		super(context);
@@ -123,6 +133,8 @@ public class NativePreviewer extends SurfaceView implements
 		this.mPreview_height = preview_height;
 	}
 
+	// This function is called by the camera component in the OS when the JPEG
+	// image of the picture taken is ready.
 	public void onPictureTaken(byte[] data, Camera camera) {
 		final String captureImageFolder = "/sdcard/BubbleBot/capturedImages/";
 		try {
@@ -131,6 +143,7 @@ public class NativePreviewer extends SurfaceView implements
 
 			String filename = curTime.format2445() + ".jpg";
 
+			// Save JPEG image to disk
 			FileOutputStream jpgFile = new FileOutputStream(captureImageFolder
 					+ filename, false);
 			jpgFile.write(data);
@@ -147,6 +160,7 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	}
 
+	// This function takes a picture with the phone camera
 	public void takePicture() {
 		Log.i("NativePreviewer", "Taking picture...");
 		try {
@@ -159,6 +173,7 @@ public class NativePreviewer extends SurfaceView implements
 			// will fail because the buffer is not big enough.
 			mCamera.setPreviewCallback(null);
 			mProcessor.clearQueue();
+			// Set focus mode to auto and flash mode to auto
 			Camera.Parameters parameters = mCamera.getParameters();
 			if (mHasAutoFocus) {
 				Log.i("NativePreviewer", "Enable Auto Focus mode");
@@ -170,17 +185,22 @@ public class NativePreviewer extends SurfaceView implements
 				parameters.setFlashMode(Camera.Parameters.FLASH_MODE_AUTO);
 			}
 			mCamera.setParameters(parameters);
+			// Send auto focus command to camera, when auto focus
+			// completes, it will call the onAutoFocus function in
+			// this class, which will then take a picture.
 			mCamera.autoFocus(this);
 		} catch (Exception e) {
 			Log.e("NativePreviewer", "takePicture", e);
 		}
 	}
 
+	// Set preview resolution
 	public void setPreviewSize(int width, int height) {
 		mPreview_width = width;
 		mPreview_height = height;
 	}
 
+	// Set camera parameters based on stored preferences 
 	public void setParamsFromPrefs(Context ctx) {
 		int size[] = { 0, 0 };
 		CameraConfig.readImageSize(ctx, size);
@@ -189,13 +209,18 @@ public class NativePreviewer extends SurfaceView implements
 		setGrayscale(mode == CameraConfig.CAMERA_MODE_BW ? true : false);
 	}
 
+	// No op. We need to create this function anyway since the class
+	// implements SurfaceCallback
 	public void surfaceCreated(SurfaceHolder holder) {
 	}
 
+	// Release the camera When the surface view is destroyed
 	public void surfaceDestroyed(SurfaceHolder holder) {
 		releaseCamera();
 	}
 
+	// This function is called after the surface is created. It initializes
+	// the camera and set up the processor for processing the live camera feed
 	public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
 		try {
 			initCamera(mHolder);
@@ -206,7 +231,6 @@ public class NativePreviewer extends SurfaceView implements
 
 		// Now that the size is known, set up the camera parameters and begin
 		// the preview.
-
 		Camera.Parameters parameters = mCamera.getParameters();
 		List<Camera.Size> pvsizes = mCamera.getParameters()
 				.getSupportedPreviewSizes();
@@ -226,6 +250,7 @@ public class NativePreviewer extends SurfaceView implements
 		Log.d("NativePreviewer", "Determined compatible preview size is: ("
 				+ mPreview_width + "," + mPreview_height + ")");
 
+		// Queries all focus modes
 		List<String> fmodes = mCamera.getParameters().getSupportedFocusModes();
 
 		String msg = "";
@@ -245,6 +270,8 @@ public class NativePreviewer extends SurfaceView implements
 			mHasAutoFocus = true;
 		}
 
+		// Queries all scene modes
+		// Interestingly, Nexus 1 does not support any scene modes at all
 		List<String> scenemodes = mCamera.getParameters()
 				.getSupportedSceneModes();
 		msg = "No supported scene modes";
@@ -262,35 +289,37 @@ public class NativePreviewer extends SurfaceView implements
 		Log.i("NativePreviewer", "Supported Scene modes:" + msg);
 
 		parameters.setPictureFormat(PixelFormat.JPEG);
-
 		parameters.setPreviewSize(mPreview_width, mPreview_height);
 
+		// Apply camera settings
 		mCamera.setParameters(parameters);
 
+		// Set up the preview callback
 		setPreviewCallbackBuffer();
+		
+		// Start camera preview
 		mCamera.startPreview();
 		mIsPreview.set(true);
 	}
 
+	// This function post a camera auto focus command in the UI thread with
+	// the specific delay.
 	public void postautofocus(int delay) {
 		if (mHasAutoFocus) {
 			mHandler.postDelayed(autofocusrunner, delay);
 		}
 	}
 
-	private Date start = null;
-	private long fcount = 0;
-
-	/**
-	 * Demonstration of how to use onPreviewFrame. In this case I'm not
-	 * processing the data, I'm just adding the buffer back to the buffer queue
-	 * for re-use
-	 */
+	// This function is called by the camera component in the OS whenever
+	// a frame from the live camera feed is ready for processing 
 	public void onPreviewFrame(byte[] data, Camera camera) {
 		if (start == null) {
 			start = new Date();
 		}
 
+		// Send the frame to the NativeProcessor for processing.
+		// Use the built-in preview buffer if the OS supports previewing with buffer.
+		// Otherwise, allocate memory for the buffer and copy the frame to the buffer.
 		if (mProcessor.isActive()) {
 			if (mFnExistSetPreviewCallbackWithBuffer) {
 				mProcessor.post(data, mPreview_width, mPreview_height,
@@ -305,6 +334,7 @@ public class NativePreviewer extends SurfaceView implements
 					"Ignoring preview frame since processor is inactive.");
 		}
 
+		// Calculate frames per second
 		fcount++;
 		if (fcount % 10 == 0) {
 			double ms = (new Date()).getTime() - start.getTime();
@@ -315,10 +345,14 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	}
 
+	// This function returns the nanoseconds needed to preview one frame.
+	// It is called by BubbleCollect for calibrating the auto focus interval.
 	public long getNanoSecondsPerFrame() {
 		return Math.round(1000000000L / mFramePerSec);
 	}
 
+	// This function is called when the NativeProcessor has completed a frame.
+	// If the preview is done using the built-in buffer, it will reuse that buffer.
 	public void onDoneNativeProcessing(byte[] buffer) {
 		if (mFnExistSetPreviewCallbackWithBuffer) {
 			try {
@@ -330,15 +364,14 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	}
 
+	// This function is used by other activity to register a list of ordered callbacks
+	// that the NativeProcessor will call for each preview frame
 	public void addCallbackStack(LinkedList<PoolCallback> callbackstack) {
 		mProcessor.addCallbackStack(callbackstack);
 	}
 
-	/**
-	 * This must be called when the activity pauses, in Activity.onPause This
-	 * has the side effect of clearing the callback stack.
-	 * 
-	 */
+	// When the activity pauses, stop camera preview and release the buffers.
+	// Also, release the camera so other application can use it.
 	public void onPause() {
 		try {
 			mIsPreview.set(false);
@@ -354,6 +387,7 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	}
 
+	// When the activity resumes, set up the preview buffer and start previewing
 	public void onResume() {
 		try {
 			initCamera(mHolder);
@@ -367,8 +401,9 @@ public class NativePreviewer extends SurfaceView implements
 		mIsPreview.set(true);
 	}
 
+	// This function sets up the preview callback
 	private void setPreviewCallbackBuffer() {
-
+		// Calculate the size of the preview buffer
 		PixelFormat pixelinfo = new PixelFormat();
 		mPixelformat = mCamera.getParameters().getPreviewFormat();
 		PixelFormat.getPixelFormatInfo(mPixelformat, pixelinfo);
@@ -377,6 +412,10 @@ public class NativePreviewer extends SurfaceView implements
 		mPreviewBuffer = new byte[previewSize.width * previewSize.height
 				* pixelinfo.bitsPerPixel / 8];
 
+		// If the OS supports previewing with buffer (API level 8),
+		// set up the preview using the built-in buffer. Otherwise,
+		// just set up preview with no buffer - we will allocate buffer
+		// on the fly.
 		if (mFnExistSetPreviewCallbackWithBuffer) {
 			try {
 				mFnAddCallbackBuffer.invoke(mCamera, mPreviewBuffer);
@@ -396,6 +435,7 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	}
 
+	// This task is used to sends an auto focus command to the camera
 	private Runnable autofocusrunner = new Runnable() {
 		public void run() {
 			if (mIsPreview.get()) {
@@ -405,6 +445,9 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	};
 
+	// This callback function is called by the OS when an auto focus
+	// command is completed. It will retry auto focusing in 1 second
+	// if the auto focus failed.
 	private Camera.AutoFocusCallback autocallback = new Camera.AutoFocusCallback() {
 		public void onAutoFocus(boolean success, Camera camera) {
 			if (!success) {
@@ -414,11 +457,9 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	};
 
+	// This function initializes the camera.
 	private void initCamera(SurfaceHolder holder) throws InterruptedException {
 		if (mCamera == null) {
-			// The Surface has been created, acquire the camera and tell it
-			// where
-			// to draw.
 			for (int i = 0; i < 10; i++)
 				try {
 					mCamera = Camera.open();
@@ -441,6 +482,7 @@ public class NativePreviewer extends SurfaceView implements
 		}
 	}
 
+	// This function releases the camera
 	private void releaseCamera() {
 		if (mCamera != null) {
 			// Surface will be destroyed when we return, so stop the preview.
@@ -454,10 +496,15 @@ public class NativePreviewer extends SurfaceView implements
 		mCamera = null;
 	}
 
+	// This function instructs the NativeProcessor to operate in color or B&W mode
 	public void setGrayscale(boolean b) {
 		mProcessor.setGrayscale(b);
 	}
 
+	// This callback function is called by the OS when NativePreviewer issues an
+	// auto focus command. It will then take a picture. This is different from the
+	// autocallback defined earlier in this class, which is used for general purpose
+	// auto focusing during the camera preview.
 	public void onAutoFocus(boolean success, Camera camera) {
 		Log.i("NativePreviewer", "Auto focus "
 				+ ((success) ? "succeeded" : "failed") + ". Taking picture...");

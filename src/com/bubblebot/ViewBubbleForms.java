@@ -12,6 +12,10 @@ import android.view.ViewGroup.LayoutParams;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
+/* ViewBubbleForms activity
+ * 
+ * This activity displays a list of processed forms for viewing
+ */
 public class ViewBubbleForms extends Activity {
 	
 	// Initialize the application  
@@ -31,6 +35,7 @@ public class ViewBubbleForms extends Activity {
 			}
 		});
 		
+		// Add the list of processed form filenames to the UI
 		for(int i = 0; i < filenames.length; i++) {
 			final Button button = new Button(this);
 			final String fname = filenames[i];

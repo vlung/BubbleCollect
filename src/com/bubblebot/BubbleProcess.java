@@ -12,8 +12,15 @@ import android.widget.FrameLayout;
 
 import com.bubblebot.jni.Processor;
 
+/* BubbleProcess activity
+ * 
+ * This activity processes an image of a bubble form and digitizes its information
+ */
 public class BubbleProcess extends Activity  {
 	
+	/* ProcessFormTask is an async task that displays a progress
+	 * dialog while processing the form in an image
+	 */
     private class ProcessFormTask extends AsyncTask<Void, Void, Void> {
         private Activity parent;
         private ProgressDialog dialog;
@@ -26,7 +33,7 @@ public class BubbleProcess extends Activity  {
         }
 
         // Before the task executes, display a progress dialog to indicate that
-        // the program is reading from the sensors.
+        // the program is processing the form.
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
@@ -49,12 +56,13 @@ public class BubbleProcess extends Activity  {
             dialog.dismiss();
             parent.finish();
             
-            //Display the processed form
+            // Lanuch the DisplayProcessedForm activity to display the processed form
             Intent intent = new Intent(getApplication(), DisplayProcessedForm.class);
             intent.putExtra("file", filename);
             startActivity(intent); 
         }
 
+        // Run the C++ code that process the form in the photo
 		@Override
 		protected Void doInBackground(Void... arg) {
 			filename = mProcessor.ProcessForm(pictureName);
@@ -63,20 +71,29 @@ public class BubbleProcess extends Activity  {
 		}
     }
  
+    // The filename of the image
     private String pictureName;
+    
+    // The image processor (C++ component)
 	private final Processor mProcessor = new Processor();
+	
+	// An instance of the process form task
 	private ProcessFormTask mTask = null;
 	
 	// Initialize the application
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		// Extract the image filename from the activity parameters
 		Bundle extras = getIntent().getExtras(); 
 		if(extras !=null)
 	    {
 	   	   pictureName = extras.getString("file");
 	   	   pictureName = (pictureName.substring(0,pictureName.length()-4));
 	    }
+		
+		// Create an async task for processing the form
 		mTask = new ProcessFormTask(this);
 		
 		FrameLayout frame = new FrameLayout(this);

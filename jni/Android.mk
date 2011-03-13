@@ -1,7 +1,3 @@
-# date: Summer, 2010 
-# author: Ethan Rublee
-# contact: ethan.rublee@gmail.com
-#
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)

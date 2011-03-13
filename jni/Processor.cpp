@@ -19,6 +19,13 @@ const char* const c_pszTxt = ".txt";
 const int c_leftMargin = 450;
 const int c_rightMargin = 1500;
 
+/* Processor
+ *
+ * This class detects the form in the received image and process the form image
+ * to detects bubbles that are filled. It will then overlay the information on
+ * the image as well as writing the digitized information to a text file.
+ */
+
 Processor::Processor() {
 }
 
@@ -195,9 +202,9 @@ char* Processor::ProcessForm(char* filename) {
 	cvLine(warpImg, cvPoint(c_rightMargin, 0), cvPoint(c_rightMargin, warpImg->height), cvScalar(
 			0, 0, 255), 3, CV_AA, 0);
 
+	// Draw detected bubbles in the image
 	int i;
 	for (i = 0; i < bubbles.size(); i++) {
-		//Count Bubbles
 		for (int j = 0; j < 5; ++j) {
 			if ((bubbles[i].y > lineValues[j].y) && (bubbles[i].y
 					< lineValues[j].y + 200)) {
@@ -276,11 +283,16 @@ char* Processor::ProcessForm(char* filename) {
 	return filename;
 }
 
+// This function identifies bubbles in an image and checks whether
+// those bubbles are "filled" or not.
 vector<Point> Processor::findBubbles(IplImage* pImage) {
 	Mat img(pImage), imgCropped, imgGrey;
 	vector < Vec3f > circles;
 	vector < Point > result;
 
+	// Crop the image to focus on the area where the bubbles are.
+	// This significantly speeds up processing time since there are
+	// usually a lot of noise on other parts of the image.
 	Size cropSize(c_rightMargin - c_leftMargin, img.rows);
 	Point cropCenter(c_leftMargin + (c_rightMargin - c_leftMargin) / 2,
 			img.rows / 2);
@@ -289,18 +301,24 @@ vector<Point> Processor::findBubbles(IplImage* pImage) {
 	// Convert the image to greyscale
 	cvtColor(imgCropped, imgGrey, CV_RGB2GRAY);
 
+	// Blur the image to reduce noise in circle detection. A 3x3 size works better
+	// but 5x5 is used to speed up the process
 	GaussianBlur(imgGrey, imgGrey, Size(5, 5), 2, 2);
 
-	// Emphasize lines in the transformed image
+	// Detects circles using the Hough Circles algorithm
 	HoughCircles(imgGrey, circles, CV_HOUGH_GRADIENT, 2, 75, 20, 15, 6, 16);
+
+	// Process each detected circle
 	for (size_t i = 0; i < circles.size(); i++) {
 		Point center(cvRound( circles[i][0]), cvRound( circles[i][1]));
 
+		// Extract the circle to a new image
 		int radius = cvRound(circles[i][2]);
 		Size patchSize(radius * 2, radius * 2);
 		Mat imgCircle(patchSize, imgGrey.type());
 		getRectSubPix(imgGrey, patchSize, center, imgCircle);
 
+		// Apply histogram on that image to tally the values in 2 bins
 		MatND hist;
 		int channels[] = { 0 };
 		int histSize[] = { 2 };
@@ -309,6 +327,8 @@ vector<Point> Processor::findBubbles(IplImage* pImage) {
 		calcHist(&imgCircle, 1, channels, Mat(), hist, 1, histSize, ranges,
 				true, false);
 
+		// If the dark bin has more count than the light bin, the bubble
+		// is filled. Add the bubble information to the result list.
 		if (hist.at<float> (0) > hist.at<float> (1)) {
 			result.push_back(center);
 		}
@@ -317,6 +337,8 @@ vector<Point> Processor::findBubbles(IplImage* pImage) {
 	return result;
 }
 
+// This function searches for the top line in an image to determine the
+// vertical positions of the 5 areas in the form.
 CvPoint * Processor::findLineValues(IplImage* img) {
 	CvPoint* lineValues = new CvPoint[5];
 	IplImage *warpImg = cvCloneImage(img);
@@ -329,13 +351,14 @@ CvPoint * Processor::findLineValues(IplImage* img) {
 	double lowThresh = 50;
 	double highThresh = 300;
 
+	// Apply Canny filter on the image
 	IplImage* bChannel = cvCreateImage(cvGetSize(warpImg), warpImg->depth, 1);
 	cvCvtPixToPlane(warpImg, bChannel, NULL, NULL, NULL);
 	IplImage* out = cvCreateImage(cvGetSize(bChannel), bChannel->depth,
 			bChannel->nChannels);
 	cvCanny(bChannel, out, lowThresh * N * N, highThresh * N * N, N);
 
-	//Find edge
+	// Find edge
 	int maxWhiteCount = 0;
 	int linePoint = 0;
 	int j, k;
@@ -355,10 +378,9 @@ CvPoint * Processor::findLineValues(IplImage* img) {
 		}
 	}
 
-	//SEEMS TO BE A BUG HERE: MAY NEED TO FIX THIS
+	// Calibrate the top line position and use that to
+	// determine the position for the other 5 lines
 	linePoint = linePoint - 60;
-	//////////////////////////////////////////////
-
 	lineValues[0].x = 0;
 	lineValues[0].y = linePoint;
 	lineValues[1].x = 0;
@@ -376,6 +398,7 @@ CvPoint * Processor::findLineValues(IplImage* img) {
 	return lineValues;
 }
 
+// This function crop the the image to the form area
 void Processor::warpImage(IplImage* img, IplImage* warpImg,
 		CvPoint * cornerPoints) {
 	CvPoint2D32f templatePoint[4], currentPoint[4];

@@ -12,6 +12,10 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+/* BubbleProcessData activity
+ * 
+ * This activity displays the digitized information of a processed form
+ */
 public class DisplayProcessedData extends Activity{
 	
 	TextView data;
@@ -20,6 +24,7 @@ public class DisplayProcessedData extends Activity{
 
 	String filename = "";
 	
+	// Set up the UI
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
        super.onCreate(savedInstanceState);

@@ -8,6 +8,11 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 
+/* Bubblebot activity
+ * 
+ * This is the main activity. It displays the main menu
+ * and launch the corresponding activity based on the user's selection
+ */
 public class BubbleBot extends Activity {
 
 	// Initialize the application

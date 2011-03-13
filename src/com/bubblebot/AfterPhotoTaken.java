@@ -18,6 +18,12 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+
+/* AfterPhotoTaken activity
+ * 
+ * This activity detects the form in the photo taken from the camera and
+ * let the user decides whether to retake the photo or process the form.
+ */
 public class AfterPhotoTaken extends Activity {
 	TextView text;
 	Button retake;
@@ -30,6 +36,9 @@ public class AfterPhotoTaken extends Activity {
 	private final Processor mProcessor = new Processor();
 	private DetectOutlineTask task;
 
+	/* DetectOutlineTask is an async task that displays a progress
+	 * dialog while detecting the form in a photo
+	 */
 	private class DetectOutlineTask extends AsyncTask<Void, Void, Void> {
 		private Activity parent;
 		private ProgressDialog dialog;
@@ -85,6 +94,7 @@ public class AfterPhotoTaken extends Activity {
 			text.setVisibility(TextView.VISIBLE);
 		}
 
+		// Run the C++ code that detects the form in the photo
 		@Override
 		protected Void doInBackground(Void... arg) {
 			detectResult = mProcessor.DetectOutline(imageFilename);
@@ -92,6 +102,7 @@ public class AfterPhotoTaken extends Activity {
 		}
 	}
 
+	// Set up the UI when the activity is created
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -106,13 +117,15 @@ public class AfterPhotoTaken extends Activity {
 		text.setText(getResources().getString(R.string.VerifyForm, capturedDir + photoFilename));
 		text.setVisibility(TextView.INVISIBLE);
 		
+		// Create an async task for detecting the form in the photo
 		task = new DetectOutlineTask(this, photoFilename);
 
+		// If user chose to retake the photo, delete the last photo taken
+		// and start the BubbleCollect activity
 		retake = (Button) findViewById(R.id.retake_button);
 		retake.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				deletePhotoAndDataFile();
-				// Start process form algorithm
 				Intent intent = new Intent(getApplication(),
 						BubbleCollect.class);
 				startActivity(intent);
@@ -120,6 +133,8 @@ public class AfterPhotoTaken extends Activity {
 			}
 		});
 
+		// If user chose to process the form, start the
+		// BubbleProcess activity
 		process = (Button) findViewById(R.id.process_button);
 		process.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
@@ -134,6 +149,8 @@ public class AfterPhotoTaken extends Activity {
 		process.setEnabled(false);
 	}
 
+	// If the user presses the back button, delete the last
+	// photo taken and exit.
 	@Override
 	public void onBackPressed() {
 		super.onBackPressed();
@@ -145,6 +162,7 @@ public class AfterPhotoTaken extends Activity {
 		super.onPause();
 	}
 
+	// Execute the task when the activity resumes
 	@Override
 	protected void onResume() {
 		super.onResume();
@@ -152,6 +170,7 @@ public class AfterPhotoTaken extends Activity {
 		task.execute(arg);
 	}
 	
+	// Delete the last photo taken and its data file
 	private void deletePhotoAndDataFile()
 	{
 		File photoFile = new File(capturedDir + photoFilename);

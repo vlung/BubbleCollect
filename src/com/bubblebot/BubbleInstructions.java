@@ -3,6 +3,10 @@ package com.bubblebot;
 import android.app.Activity;
 import android.os.Bundle;
 
+/* BubbleInstructions activity
+ * 
+ * This activity displays the instructions on screen
+ */
 public class BubbleInstructions extends Activity {
 
 	// Initialize the application
