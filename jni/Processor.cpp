@@ -16,6 +16,8 @@ const char* const c_pszTempJpgFilename = "/sdcard/BubbleBot/preview.jpg";
 const char* const c_pszLastCannyFilename = "/sdcard/BubbleBot/lastCanny.jpg";
 const char* const c_pszJpg = ".jpg";
 const char* const c_pszTxt = ".txt";
+const int c_leftMargin = 450;
+const int c_rightMargin = 1500;
 
 Processor::Processor() {
 }
@@ -43,7 +45,8 @@ extern float angle(Point pt1, Point pt2, Point pt0);
 //		<filename>.txt in the processedImages folder. If the file exists, the function
 //		will return the data from the file and skip the image processing to save time.
 // outline - Out parameter that contains the detected rectangle
-bool Processor::DetectOutline(char* filename, bool fIgnoreDatFile, Rect &outline) {
+bool Processor::DetectOutline(char* filename, bool fIgnoreDatFile,
+		Rect &outline) {
 	bool fDetected = false;
 	int maxContourArea = 100000;
 	Mat img, imgGrey, imgCanny;
@@ -177,9 +180,7 @@ char* Processor::ProcessForm(char* filename) {
 	lineValues = findLineValues(warpImg);
 
 	//Find bubbles
-	CvPoint * bubbles;
-	bubbles = findBubbles(warpImg);
-	int numBubbles = bubbles[0].x;
+	vector < Point > bubbles = findBubbles(warpImg);
 
 	//Count bubbles
 	int * count = new int[5];
@@ -189,40 +190,22 @@ char* Processor::ProcessForm(char* filename) {
 	count[3] = 0;
 	count[4] = 0;
 
-	cvLine(warpImg, cvPoint(450, 0), cvPoint(450, warpImg->height), cvScalar(0,
+	cvLine(warpImg, cvPoint(c_leftMargin, 0), cvPoint(c_leftMargin, warpImg->height), cvScalar(0,
 			0, 255), 3, CV_AA, 0);
-	cvLine(warpImg, cvPoint(1500, 0), cvPoint(1500, warpImg->height), cvScalar(
+	cvLine(warpImg, cvPoint(c_rightMargin, 0), cvPoint(c_rightMargin, warpImg->height), cvScalar(
 			0, 0, 255), 3, CV_AA, 0);
 
-	int i = 0;
-	for (i = 1; i < numBubbles + 1; i++) {
-		if ((bubbles[i].x > 450) && (bubbles[i].x < 1500)) {
-			//Count Bubbles
-			if ((bubbles[i].y > lineValues[0].y) && (bubbles[i].y
-					< lineValues[1].y)) {
-				count[0]++;
+	int i;
+	for (i = 0; i < bubbles.size(); i++) {
+		//Count Bubbles
+		for (int j = 0; j < 5; ++j) {
+			if ((bubbles[i].y > lineValues[j].y) && (bubbles[i].y
+					< lineValues[j].y + 200)) {
+				++count[j];
+				bubbles[i].x += c_leftMargin;
 				cvCircle(warpImg, bubbles[i], 20, cvScalar(0, 0, 255), 3,
 						CV_AA, 0);
-			} else if ((bubbles[i].y > lineValues[1].y) && (bubbles[i].y
-					< lineValues[2].y)) {
-				count[1]++;
-				cvCircle(warpImg, bubbles[i], 20, cvScalar(0, 0, 255), 3,
-						CV_AA, 0);
-			} else if ((bubbles[i].y > lineValues[2].y) && (bubbles[i].y
-					< lineValues[3].y)) {
-				count[2]++;
-				cvCircle(warpImg, bubbles[i], 20, cvScalar(0, 0, 255), 3,
-						CV_AA, 0);
-			} else if ((bubbles[i].y > lineValues[3].y) && (bubbles[i].y
-					< lineValues[4].y)) {
-				count[3]++;
-				cvCircle(warpImg, bubbles[i], 20, cvScalar(0, 0, 255), 3,
-						CV_AA, 0);
-			} else if ((bubbles[i].y > lineValues[4].y) && (bubbles[i].y
-					< warpImg->height)) {
-				count[4]++;
-				cvCircle(warpImg, bubbles[i], 20, cvScalar(0, 0, 255), 3,
-						CV_AA, 0);
+				break;
 			}
 		}
 	}
@@ -239,7 +222,7 @@ char* Processor::ProcessForm(char* filename) {
 		int Y = lineValues[i].y + 130;
 		char * number = new char[5];
 		sprintf(number, "=%i", count[i]);
-		cvPutText(warpImg, number, cvPoint(1500, Y), &font, cvScalar(255, 0, 0));
+		cvPutText(warpImg, number, cvPoint(c_rightMargin, Y), &font, cvScalar(255, 0, 0));
 	}
 
 	//Draw results
@@ -279,7 +262,7 @@ char* Processor::ProcessForm(char* filename) {
 	fprintf(file, "Total Polio: %i\n", count[1]);
 	fprintf(file, "Total Measles: %i\n", count[2]);
 	fprintf(file, "Total Hepatitis B: %i\n", count[3]);
-	fprintf(file, "Total Hepatitus B: %i\n", count[4]);
+	fprintf(file, "Total Hepatitis B: %i\n", count[4]);
 	fprintf(file, "Total All: %i\n", count[0] + count[1] + count[2] + count[3]
 			+ count[4]);
 
@@ -291,6 +274,47 @@ char* Processor::ProcessForm(char* filename) {
 
 	LOGI("Exiting ProcessForm()");
 	return filename;
+}
+
+vector<Point> Processor::findBubbles(IplImage* pImage) {
+	Mat img(pImage), imgCropped, imgGrey;
+	vector < Vec3f > circles;
+	vector < Point > result;
+
+	Size cropSize(c_rightMargin - c_leftMargin, img.rows);
+	Point cropCenter(c_leftMargin + (c_rightMargin - c_leftMargin) / 2,
+			img.rows / 2);
+	getRectSubPix(img, cropSize, cropCenter, imgCropped);
+
+	// Convert the image to greyscale
+	cvtColor(imgCropped, imgGrey, CV_RGB2GRAY);
+
+	GaussianBlur(imgGrey, imgGrey, Size(5, 5), 2, 2);
+
+	// Emphasize lines in the transformed image
+	HoughCircles(imgGrey, circles, CV_HOUGH_GRADIENT, 2, 75, 20, 15, 6, 16);
+	for (size_t i = 0; i < circles.size(); i++) {
+		Point center(cvRound( circles[i][0]), cvRound( circles[i][1]));
+
+		int radius = cvRound(circles[i][2]);
+		Size patchSize(radius * 2, radius * 2);
+		Mat imgCircle(patchSize, imgGrey.type());
+		getRectSubPix(imgGrey, patchSize, center, imgCircle);
+
+		MatND hist;
+		int channels[] = { 0 };
+		int histSize[] = { 2 };
+		float range[] = { 0, 255 };
+		const float *ranges[] = { range };
+		calcHist(&imgCircle, 1, channels, Mat(), hist, 1, histSize, ranges,
+				true, false);
+
+		if (hist.at<float> (0) > hist.at<float> (1)) {
+			result.push_back(center);
+		}
+	}
+
+	return result;
 }
 
 CvPoint * Processor::findLineValues(IplImage* img) {
@@ -340,9 +364,9 @@ CvPoint * Processor::findLineValues(IplImage* img) {
 	lineValues[1].x = 0;
 	lineValues[1].y = linePoint + 260;
 	lineValues[2].x = 0;
-	lineValues[2].y = linePoint + 520;
+	lineValues[2].y = linePoint + 510;
 	lineValues[3].x = 0;
-	lineValues[3].y = linePoint + 780;
+	lineValues[3].y = linePoint + 770;
 	lineValues[4].x = 0;
 	lineValues[4].y = linePoint + 1040;
 
@@ -350,119 +374,6 @@ CvPoint * Processor::findLineValues(IplImage* img) {
 	cvReleaseImage(&bChannel);
 	cvReleaseImage(&out);
 	return lineValues;
-}
-
-CvPoint * Processor::findBubbles(IplImage* img) {
-	list < CvPoint > pointList;
-
-	//Prepare for thresholding
-	IplImage *val = cvCreateImage(cvGetSize(img), img->depth, 1);
-	IplImage *hue = cvCreateImage(cvGetSize(img), img->depth, 1);
-	IplImage *sat = cvCreateImage(cvGetSize(img), img->depth, 1);
-
-	IplImage *valT = cvCreateImage(cvGetSize(img), img->depth, 1);
-	IplImage *hueT = cvCreateImage(cvGetSize(img), img->depth, 1);
-	IplImage *satT = cvCreateImage(cvGetSize(img), img->depth, 1);
-	IplImage *hsvT = cvCreateImage(cvGetSize(img), img->depth, 3);
-
-	//Calculate hue, saturation and value images
-	IplImage *imgHSV =
-			cvCreateImage(cvGetSize(img), img->depth, img->nChannels);
-	cvCvtColor(img, imgHSV, CV_BGR2HSV);
-
-	//Separate into single channels
-	cvCvtPixToPlane(imgHSV, hue, sat, val, NULL);
-
-	//Thresholding  100  50  150
-	cvThreshold(hue, hueT, 40, 255, CV_THRESH_BINARY);
-	cvThreshold(sat, satT, 30, 255, CV_THRESH_BINARY);
-	cvThreshold(val, valT, 200, 255, CV_THRESH_BINARY_INV);
-
-	//Combine thresholds
-	cvCvtPlaneToPix(satT, valT, hueT, NULL, hsvT);
-	CvScalar s;
-	int i, j;
-	for (i = 0; i < hsvT->height; i++) {
-		for (j = 0; j < hsvT->width; j++) {
-			s = cvGet2D(hsvT, i, j);
-			if (s.val[0] != 255) {
-				cvSet2D(hsvT, i, j, cvScalar(0));
-			}
-			if (s.val[1] != 255) {
-				cvSet2D(hsvT, i, j, cvScalar(0));
-			}
-			if (s.val[2] != 255) {
-				cvSet2D(hsvT, i, j, cvScalar(0));
-			}
-		}
-	}
-
-	//Take one channel of combined thresholds (all the same anyway)
-	cvCvtPixToPlane(hsvT, hue, NULL, NULL, NULL);
-
-	//Find contours
-	CvMemStorage* storage = cvCreateMemStorage(0);
-	CvSeq* contour = 0;
-	CvMoments moments;
-	cvFindContours(hue, storage, &contour, sizeof(CvContour), CV_RETR_CCOMP,
-			CV_CHAIN_APPROX_SIMPLE);
-
-	int totalContours = 0;
-	for (; contour != 0; contour = contour->h_next) {
-		totalContours++;
-		double area = fabs(cvContourArea(contour));
-
-		if (area > 100) {
-			//Get centroid of contour
-			cvMoments(contour, &moments, 1);
-			double xc = moments.m10 / moments.m00;
-			double yc = moments.m01 / moments.m00;
-			CvPoint p = cvPoint(xc, yc);
-			pointList.push_back(p);
-		}
-	}
-
-	CvPoint * bubblesFound = new CvPoint[pointList.size() + 1];
-	CvPoint num;
-	num.x = pointList.size();
-	num.y = 0;
-	bubblesFound[0] = num;
-	for (i = 0; i < num.x; i++) {
-		bubblesFound[i + 1] = pointList.back();
-		pointList.pop_back();
-	}
-
-	//Get rid of duplicates - set detected duplicates to x=5000, y=5000
-	for (i = 1; i < num.x + 1; i++) {
-		for (j = 1; j < num.x + 1; j++) {
-			if (i != j) {
-				int X = bubblesFound[i].x;
-				int Y = bubblesFound[i].y;
-
-				if ((bubblesFound[j].x == 5000) && (bubblesFound[j].y == 5000)) {
-				} else if ((bubblesFound[j].x > X - 50) && (bubblesFound[j].x
-						< X + 50)) {
-					if ((bubblesFound[j].y > Y - 50) && (bubblesFound[j].y < Y
-							+ 50)) {
-						//SAME BUBBLE
-						bubblesFound[j].x = 5000;
-						bubblesFound[j].y = 5000;
-					}
-				}
-			}
-		}
-	}
-
-	cvReleaseImage(&val);
-	cvReleaseImage(&hue);
-	cvReleaseImage(&sat);
-	cvReleaseImage(&valT);
-	cvReleaseImage(&hueT);
-	cvReleaseImage(&satT);
-	cvReleaseImage(&hsvT);
-	cvReleaseImage(&imgHSV);
-
-	return bubblesFound;
 }
 
 void Processor::warpImage(IplImage* img, IplImage* warpImg,
@@ -498,263 +409,3 @@ void Processor::warpImage(IplImage* img, IplImage* warpImg,
 	cvSetImageROI(warpImg, rect);
 	cvReleaseMat(&map);
 }
-
-/*
- CvPoint* Processor::findCornerPoints(IplImage* img) {
- int WIDTH = 30;
- int HEIGHT = 250;
- int P1 = 400;
- int P2 = 1200;
-
- IplImage *img2, *img3, *bChannel, *out;
-
- //Define places in the image to detect form edges
- CvRect * top = new CvRect[2];
- CvRect * bottom = new CvRect[2];
- CvRect * left = new CvRect[2];
- CvRect * right = new CvRect[2];
-
- top[0] = cvRect(P1, 0, WIDTH, HEIGHT);
- top[1] = cvRect(P2, 0, WIDTH, HEIGHT);
-
- bottom[0] = cvRect(P1, img->height - HEIGHT, WIDTH, HEIGHT);
- bottom[1] = cvRect(P2, img->height - HEIGHT, WIDTH, HEIGHT);
-
- left[0] = cvRect(0, P1, HEIGHT, WIDTH);
- left[1] = cvRect(0, P2, HEIGHT, WIDTH);
-
- right[0] = cvRect(img->width - HEIGHT, P1, HEIGHT, WIDTH);
- right[1] = cvRect(img->width - HEIGHT, P2, HEIGHT, WIDTH);
-
- //params for Canny
- int N = 7;
- double lowThresh = 50;
- double highThresh = 400;
-
- int *topPoints = new int[2];
- int *bottomPoints = new int[2];
- int *leftPoints = new int[2];
- int *rightPoints = new int[2];
-
- int i = 0, j = 0, k = 0;
- int maxWhiteCount = 0, whiteCount = 0;
-
- //FIND THE TOP OF THE FORM
- for (i = 0; i < 2; i++) {
- cvSetImageROI(img, top[i]);
- img2 = cvCreateImage(cvGetSize(img), img->depth, img->nChannels);
- cvCopy(img, img2, NULL);
- cvResetImageROI(img);
-
- img3 = cvCreateImage(cvGetSize(img2), img2->depth, img2->nChannels);
- cvSmooth(img2, img3, CV_GAUSSIAN, 1, 13);
-
- bChannel = cvCreateImage(cvGetSize(img2), img2->depth, 1);
- cvCvtPixToPlane(img3, bChannel, NULL, NULL, NULL);
- out = cvCreateImage(cvGetSize(bChannel), bChannel->depth,
- bChannel->nChannels);
- cvCanny(bChannel, out, lowThresh * N * N, highThresh * N * N, N);
-
- maxWhiteCount = 0;
- CvScalar s;
- for (j = 0; j < out->height; j++) {
- whiteCount = 0;
- for (k = 0; k < out->width; k++) {
- s = cvGet2D(out, j, k);
- if (s.val[0] == 255) {
- whiteCount++;
- }
- }
- if (whiteCount > maxWhiteCount) {
- maxWhiteCount = whiteCount;
- topPoints[i] = j;
- }
- }
- }
-
- //FIND THE BOTTOM OF THE FORM
- for (i = 0; i < 2; i++) {
- cvSetImageROI(img, bottom[i]);
- img2 = cvCreateImage(cvGetSize(img), img->depth, img->nChannels);
- cvCopy(img, img2, NULL);
- cvResetImageROI(img);
-
- img3 = cvCreateImage(cvGetSize(img2), img2->depth, img2->nChannels);
- cvSmooth(img2, img3, CV_GAUSSIAN, 1, 13);
-
- bChannel = cvCreateImage(cvGetSize(img2), img2->depth, 1);
- cvCvtPixToPlane(img3, bChannel, NULL, NULL, NULL);
- out = cvCreateImage(cvGetSize(bChannel), bChannel->depth,
- bChannel->nChannels);
- cvCanny(bChannel, out, lowThresh * N * N, highThresh * N * N, N);
-
- maxWhiteCount = 0;
- CvScalar s;
- for (j = 0; j < out->height; j++) {
- whiteCount = 0;
- for (k = 0; k < out->width; k++) {
- s = cvGet2D(out, j, k);
- if (s.val[0] == 255) {
- whiteCount++;
- }
- }
- if (whiteCount > maxWhiteCount) {
- maxWhiteCount = whiteCount;
- bottomPoints[i] = j;
- }
- }
- }
-
- //FIND THE LEFT OF THE FORM
- for (i = 0; i < 2; i++) {
- cvSetImageROI(img, left[i]);
- img2 = cvCreateImage(cvGetSize(img), img->depth, img->nChannels);
- cvCopy(img, img2, NULL);
- cvResetImageROI(img);
-
- img3 = cvCreateImage(cvGetSize(img2), img2->depth, img2->nChannels);
- cvSmooth(img2, img3, CV_GAUSSIAN, 1, 13);
-
- bChannel = cvCreateImage(cvGetSize(img2), img2->depth, 1);
- cvCvtPixToPlane(img3, bChannel, NULL, NULL, NULL);
- out = cvCreateImage(cvGetSize(bChannel), bChannel->depth,
- bChannel->nChannels);
- cvCanny(bChannel, out, lowThresh * N * N, highThresh * N * N, N);
-
- maxWhiteCount = 0;
- CvScalar s;
- for (j = 0; j < out->width; j++) {
- whiteCount = 0;
- for (k = 0; k < out->height; k++) {
- s = cvGet2D(out, k, j);
- if (s.val[0] == 255) {
- whiteCount++;
- }
- }
- if (whiteCount > maxWhiteCount) {
- maxWhiteCount = whiteCount;
- leftPoints[i] = j;
- }
- }
- }
-
- //FIND THE RIGHT OF THE FORM
- for (i = 0; i < 2; i++) {
- cvSetImageROI(img, right[i]);
- img2 = cvCreateImage(cvGetSize(img), img->depth, img->nChannels);
- cvCopy(img, img2, NULL);
- cvResetImageROI(img);
-
- img3 = cvCreateImage(cvGetSize(img2), img2->depth, img2->nChannels);
- cvSmooth(img2, img3, CV_GAUSSIAN, 1, 13);
-
- bChannel = cvCreateImage(cvGetSize(img2), img2->depth, 1);
- cvCvtPixToPlane(img3, bChannel, NULL, NULL, NULL);
- out = cvCreateImage(cvGetSize(bChannel), bChannel->depth,
- bChannel->nChannels);
- cvCanny(bChannel, out, lowThresh * N * N, highThresh * N * N, N);
-
- maxWhiteCount = 0;
- CvScalar s;
- for (j = 0; j < out->width; j++) {
- whiteCount = 0;
- for (k = 0; k < out->height; k++) {
- s = cvGet2D(out, k, j);
- if (s.val[0] == 255) {
- whiteCount++;
- }
- }
- if (whiteCount > maxWhiteCount) {
- maxWhiteCount = whiteCount;
- rightPoints[i] = j;
- }
- }
- }
-
- //Get equation of top line
- // y = slopeTop * x + interceptTop
- double firstPointX = P2 + (WIDTH / 2);
- double firstPointY = topPoints[1];
- double secondPointX = P1 + (WIDTH / 2);
- double secondPointY = topPoints[0];
-
- double slopeTop = (firstPointY - secondPointY) / (firstPointX
- - secondPointX);
- double interceptTop = secondPointY - (slopeTop * secondPointX);
-
- //Get equation of bottom line
- // y = slopeBottom * x + interceptBottom
- firstPointX = P2 + (WIDTH / 2);
- firstPointY = img->height - HEIGHT + bottomPoints[1];
- secondPointX = P1 + (WIDTH / 2);
- secondPointY = img->height - HEIGHT + bottomPoints[0];
-
- double slopeBottom = (firstPointY - secondPointY) / (firstPointX
- - secondPointX);
- double interceptBottom = secondPointY - (slopeBottom * secondPointX);
-
- //Get equation of left line
- // y = slopeLeft * x + interceptLeft
- firstPointY = P2 + (WIDTH / 2);
- firstPointX = leftPoints[1];
- secondPointY = P1 + (WIDTH / 2);
- secondPointX = leftPoints[0];
-
- double slopeLeft = (firstPointY - secondPointY) / (firstPointX
- - secondPointX);
- double interceptLeft = secondPointY - (slopeLeft * secondPointX);
-
- //Get equation of right line
- // y = slopeRight * x + interceptRight
- firstPointY = P2 + (WIDTH / 2);
- firstPointX = img->width - HEIGHT + rightPoints[1];
- secondPointY = P1 + (WIDTH / 2);
- secondPointX = img->width - HEIGHT + rightPoints[0];
-
- double slopeRight = (firstPointY - secondPointY) / (firstPointX
- - secondPointX);
- double interceptRight = secondPointY - (slopeRight * secondPointX);
-
- //Find where lines intersect to get corners of form
- //Top and left lines
- double topLeftCornerX = (interceptTop - interceptLeft) / (slopeLeft
- - slopeTop);
- double topLeftCornerY = (slopeTop * topLeftCornerX) + interceptTop;
-
- //Bottom and left lines
- double bottomLeftCornerX = (interceptBottom - interceptLeft) / (slopeLeft
- - slopeBottom);
- double bottomLeftCornerY = (slopeBottom * bottomLeftCornerX)
- + interceptBottom;
-
- //Top and right lines
- double topRightCornerX = (interceptTop - interceptRight) / (slopeRight
- - slopeTop);
- double topRightCornerY = (slopeTop * topRightCornerX) + interceptTop;
-
- //Bottom and right lines
- double bottomRightCornerX = (interceptBottom - interceptRight)
- / (slopeRight - slopeBottom);
- double bottomRightCornerY = (slopeBottom * bottomRightCornerX)
- + interceptBottom;
-
- //To return
- CvPoint * cornerPoints = new CvPoint[4];
- cornerPoints[0].x = topLeftCornerX;
- cornerPoints[0].y = topLeftCornerY;
- cornerPoints[1].x = topRightCornerX;
- cornerPoints[1].y = topRightCornerY;
- cornerPoints[3].x = bottomLeftCornerX;
- cornerPoints[3].y = bottomLeftCornerY;
- cornerPoints[2].x = bottomRightCornerX;
- cornerPoints[2].y = bottomRightCornerY;
-
- // Cleanup
- cvReleaseImage(&img2);
- cvReleaseImage(&img3);
- cvReleaseImage(&out);
- cvReleaseImage(&bChannel);
-
- return cornerPoints;
- }
- */

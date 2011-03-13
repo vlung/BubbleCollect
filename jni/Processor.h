@@ -18,7 +18,7 @@ public:
   bool DetectOutline(char* filename, bool fIgnoreDatFile = false);
   bool DetectOutline(char* filename, bool fIgnoreDatFile, cv::Rect &r);
   void warpImage(IplImage* img, IplImage* warpImg, CvPoint * cornerPoints);
-  CvPoint* findBubbles(IplImage* img);
+  std::vector<cv::Point> findBubbles(IplImage* pImage);
   CvPoint * findLineValues(IplImage* img);
 
 private:
