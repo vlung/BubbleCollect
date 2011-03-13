@@ -25,7 +25,7 @@ import com.opencv.camera.NativeProcessor.PoolCallback;
 
 public class NativePreviewer extends SurfaceView implements
 		SurfaceHolder.Callback, Camera.PreviewCallback, Camera.PictureCallback,
-		NativeProcessorCallback {
+		Camera.AutoFocusCallback, NativeProcessorCallback {
 
 	public interface PictureSavedCallback {
 		void OnPictureSaved(String filename);
@@ -47,7 +47,8 @@ public class NativePreviewer extends SurfaceView implements
 	private Boolean mFnExistSetPreviewCallbackWithBuffer = false;
 	private Method mFnAddCallbackBuffer = null;
 	private Method mFnSetPreviewCallbackWithBuffer = null;
-	
+	private double mFramePerSec = 1;
+
 	public long initTime;
 
 	private void init() {
@@ -158,7 +159,18 @@ public class NativePreviewer extends SurfaceView implements
 			// will fail because the buffer is not big enough.
 			mCamera.setPreviewCallback(null);
 			mProcessor.clearQueue();
-			mCamera.takePicture(null, null, this);
+			Camera.Parameters parameters = mCamera.getParameters();
+			if (mHasAutoFocus) {
+				Log.i("NativePreviewer", "Enable Auto Focus mode");
+				parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+			}
+			if (mCamera.getParameters().getSupportedFlashModes()
+					.contains(Camera.Parameters.FLASH_MODE_AUTO)) {
+				Log.i("NativePreviewer", "Enable Auto Flash mode");
+				parameters.setFlashMode(Camera.Parameters.FLASH_MODE_AUTO);
+			}
+			mCamera.setParameters(parameters);
+			mCamera.autoFocus(this);
 		} catch (Exception e) {
 			Log.e("NativePreviewer", "takePicture", e);
 		}
@@ -216,6 +228,12 @@ public class NativePreviewer extends SurfaceView implements
 
 		List<String> fmodes = mCamera.getParameters().getSupportedFocusModes();
 
+		String msg = "";
+		for (String mode : fmodes) {
+			msg += mode + ";";
+		}
+		Log.i("NativePreviewer", "Supported Focus modes:" + msg);
+
 		int idx = fmodes.indexOf(Camera.Parameters.FOCUS_MODE_INFINITY);
 		if (idx != -1) {
 			parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_INFINITY);
@@ -229,17 +247,19 @@ public class NativePreviewer extends SurfaceView implements
 
 		List<String> scenemodes = mCamera.getParameters()
 				.getSupportedSceneModes();
+		msg = "No supported scene modes";
 		if (scenemodes != null) {
+			msg = "";
+			for (String mode : scenemodes) {
+				msg += mode + ";";
+			}
 			if (scenemodes.indexOf(Camera.Parameters.SCENE_MODE_STEADYPHOTO) != -1) {
 				parameters
 						.setSceneMode(Camera.Parameters.SCENE_MODE_STEADYPHOTO);
 				Log.d("NativePreviewer", "***Steady mode");
 			}
 		}
-
-		if (mCamera.getParameters().getFlashMode() != null) {
-			parameters.setFlashMode(Camera.Parameters.FLASH_MODE_ON);
-		}
+		Log.i("NativePreviewer", "Supported Scene modes:" + msg);
 
 		parameters.setPictureFormat(PixelFormat.JPEG);
 
@@ -253,24 +273,23 @@ public class NativePreviewer extends SurfaceView implements
 	}
 
 	public void postautofocus(int delay) {
-		if (mHasAutoFocus)
-		{
+		if (mHasAutoFocus) {
 			mHandler.postDelayed(autofocusrunner, delay);
 		}
 	}
 
 	private Date start = null;
 	private long fcount = 0;
-	
+
 	/**
 	 * Demonstration of how to use onPreviewFrame. In this case I'm not
 	 * processing the data, I'm just adding the buffer back to the buffer queue
 	 * for re-use
 	 */
 	public void onPreviewFrame(byte[] data, Camera camera) {
-        if (start == null) {
-            start = new Date();
-        }
+		if (start == null) {
+			start = new Date();
+		}
 
 		if (mProcessor.isActive()) {
 			if (mFnExistSetPreviewCallbackWithBuffer) {
@@ -285,14 +304,19 @@ public class NativePreviewer extends SurfaceView implements
 			Log.i("NativePreviewer",
 					"Ignoring preview frame since processor is inactive.");
 		}
-		
-        fcount++;
-        if (fcount % 100 == 0) {
-            double ms = (new Date()).getTime() - start.getTime();
-            Log.i("NativePreviewer", "fps:" + fcount / (ms / 1000.0));
-            start = new Date();
-            fcount = 0;
-        }
+
+		fcount++;
+		if (fcount % 10 == 0) {
+			double ms = (new Date()).getTime() - start.getTime();
+			mFramePerSec = (mFramePerSec + (fcount / (ms / 1000.0))) / 2;
+			Log.i("NativePreviewer", "fps:" + mFramePerSec);
+			start = new Date();
+			fcount = 0;
+		}
+	}
+
+	public long getNanoSecondsPerFrame() {
+		return Math.round(1000000000L / mFramePerSec);
 	}
 
 	public void onDoneNativeProcessing(byte[] buffer) {
@@ -363,8 +387,9 @@ public class NativePreviewer extends SurfaceView implements
 			try {
 				mFnSetPreviewCallbackWithBuffer.invoke(mCamera, this);
 			} catch (Exception e) {
-				Log.e("NativePreviewer", "Invoking setPreviewCallbackWithBuffer failed: "
-						+ e.toString());
+				Log.e("NativePreviewer",
+						"Invoking setPreviewCallbackWithBuffer failed: "
+								+ e.toString());
 			}
 		} else {
 			mCamera.setPreviewCallback(this);
@@ -373,8 +398,8 @@ public class NativePreviewer extends SurfaceView implements
 
 	private Runnable autofocusrunner = new Runnable() {
 		public void run() {
-			if (mIsPreview.get())
-			{
+			if (mIsPreview.get()) {
+				Log.i("NativePreviewer", "autofocusing...");
 				mCamera.autoFocus(autocallback);
 			}
 		}
@@ -382,8 +407,10 @@ public class NativePreviewer extends SurfaceView implements
 
 	private Camera.AutoFocusCallback autocallback = new Camera.AutoFocusCallback() {
 		public void onAutoFocus(boolean success, Camera camera) {
-			if (!success)
+			if (!success) {
+				Log.e("NativePreviewer", "autofocus failed");
 				postautofocus(1000);
+			}
 		}
 	};
 
@@ -399,8 +426,7 @@ public class NativePreviewer extends SurfaceView implements
 				} catch (RuntimeException e) {
 					Log.e("NativePreviewer", "Failed to open camera", e);
 					Thread.sleep(200);
-					if (i == 9)
-					{
+					if (i == 9) {
 						throw e;
 					}
 				}
@@ -432,4 +458,9 @@ public class NativePreviewer extends SurfaceView implements
 		mProcessor.setGrayscale(b);
 	}
 
+	public void onAutoFocus(boolean success, Camera camera) {
+		Log.i("NativePreviewer", "Auto focus "
+				+ ((success) ? "succeeded" : "failed") + ". Taking picture...");
+		camera.takePicture(null, null, this);
+	}
 }

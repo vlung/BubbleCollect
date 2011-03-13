@@ -46,10 +46,12 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 
 	// Members for tracking accelerometer
 	static private float c_StationaryThreshold = 0.25F;
-	// Refresh accelerometer reading no less than .5 seconds
-	static private long c_AccelrefreshInterval = 500000000L;
-	// Auto focus no more than once every 3 seconds
+	// Refresh accelerometer reading no less than .25 seconds
+	static private long c_AccelrefreshInterval = 250000000L;
+	// Auto focus once every 3 seconds
 	static private long c_AutoFocusInterval = 3000000000L;
+	// Auto focus once every 3 frames
+	static private float c_AutoFocusFrame = 3;
 	private final float alpha = (float) 0.8;
 	private float[] mAccelMA = new float[3];
 	private float[] mGravity = new float[3];
@@ -57,7 +59,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	private TextView mDebugTextView = null;
 	private long mLastAutoFocusTime = 0;
 	private long mLastRefreshTime = 0;
-	
+
 	private long mCreateTime;
 	private long mTakePictureTime;
 
@@ -76,19 +78,20 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		public void run() {
 			Time now = new Time();
 			now.setToNow();
-			mTakePictureTime = now.toMillis(true); 
+			mTakePictureTime = now.toMillis(true);
 			mPreview.takePicture();
 		}
 	};
-	
-	private void ShowHelp()
-	{
-		Toast.makeText(this, R.string.BubbleCollect_help_toast, Toast.LENGTH_LONG).show();
+
+	private void ShowHelp() {
+		Toast.makeText(this, R.string.BubbleCollect_help_toast,
+				Toast.LENGTH_LONG).show();
 	}
 
 	public void OnPictureSaved(String filename) {
-		double timeTaken = (double)(new Date().getTime() - mTakePictureTime) / 1000;
-		Log.i("BubbleCollect", "Take photo elapsed time:" + String.format("%.2f", timeTaken));
+		double timeTaken = (double) (new Date().getTime() - mTakePictureTime) / 1000;
+		Log.i("BubbleCollect",
+				"Take photo elapsed time:" + String.format("%.2f", timeTaken));
 		// Start activity to handle actions after taking photo
 		Intent intent = new Intent(getApplication(), AfterPhotoTaken.class);
 		intent.putExtra("file", filename);
@@ -108,16 +111,15 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 
 		public void process(int idx, image_pool pool, long timestamp,
 				NativeProcessor nativeProcessor) {
-			if (mCreateTime != 0)
-			{
-				double timeTaken = (double)(new Date().getTime() - mCreateTime) / 1000;
-				Log.i("BubbleCollect", "Init elapsed time:" + String.format("%.2f", timeTaken));
+			if (mCreateTime != 0) {
+				double timeTaken = (double) (new Date().getTime() - mCreateTime) / 1000;
+				Log.i("BubbleCollect",
+						"Init elapsed time:" + String.format("%.2f", timeTaken));
 				mCreateTime = 0;
 			}
 			// Automatically take photo when the form is correctly positioned.
-			if (1 == mFeedback.DetectOutline(idx, pool, mCannyThres1, mCannyThres1
-					* c_CannyMultiplier))
-			{
+			if (1 == mFeedback.DetectOutline(idx, pool, mCannyThres1,
+					mCannyThres1 * c_CannyMultiplier)) {
 				takePhoto();
 			}
 		}
@@ -166,7 +168,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		
+
 		mCreateTime = new Date().getTime();
 
 		setFullscreen();
@@ -238,7 +240,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		Editor editor = settings.edit();
 		editor.putInt(CameraConfig.CAMERA_MODE, CameraConfig.CAMERA_MODE_COLOR);
 		editor.commit();
-		
+
 		ShowHelp();
 	}
 
@@ -265,7 +267,7 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 		sensorManager.registerListener(this,
 				sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
 				SensorManager.SENSOR_DELAY_NORMAL);
-		
+
 		mFeedback.ResetScore();
 
 		glview.onResume();
@@ -318,14 +320,15 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 					// The phone is moving, reset the moving averages to
 					// allow smooth stationary detection
 					mStationary = false;
-					mAccelMA[0] = mAccelMA[1] = mAccelMA[2] = 1.0F;
+					mAccelMA[0] = mAccelMA[1] = mAccelMA[2] = 0.5F;
 				}
 			} else {
 				// If the phone has just become stationary, trigger
 				// the autofocus action of the camera unless we
 				// already triggered autofocus not too long ago.
 				if (mStationary == false
-						&& event.timestamp - mLastAutoFocusTime > c_AutoFocusInterval) {
+						&& event.timestamp - mLastAutoFocusTime > Math.min(c_AutoFocusInterval,
+								mPreview.getNanoSecondsPerFrame() * c_AutoFocusFrame)) {
 					mLastAutoFocusTime = event.timestamp;
 					mPreview.postautofocus(100);
 				}
@@ -333,9 +336,9 @@ public class BubbleCollect extends Activity implements SensorEventListener,
 			}
 
 			// Show debug messages
-			// String s = String.format("%.2f %.2f %.2f", accel[0], accel[1],
-			// accel[2]);
-			// mDebugTextView.setText(s);
+//			String s = String.format("%.2f %.2f %.2f", accel[0], accel[1],
+//					accel[2]);
+//			mDebugTextView.setText(s);
 		}
 	}
 }
